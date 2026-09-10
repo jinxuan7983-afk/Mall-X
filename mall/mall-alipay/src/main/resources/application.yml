@@ -1,0 +1,65 @@
+server:
+  port: 10030
+
+spring:
+  application:
+    name: mall-alipay
+  cloud:
+    nacos:
+      config:
+        enabled: false
+      discovery:
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/mall_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PWD:root123}
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      database: 0
+      timeout: 3000ms
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+  global-config:
+    banner: false
+
+rocketmq:
+  name-server: ${ROCKETMQ_ADDR:127.0.0.1:9876}
+  producer:
+    group: mall-alipay-producer
+    send-message-timeout: 3000
+
+mallx:
+  sign:
+    enabled: true
+    secret: ${SIGN_SECRET:mallx-pay-secret-2026}
+    exclude-paths:
+      - /pay/callback/alipay
+      - /pay/mock/**
+      - /internal/**
+      - /error
+      - /actuator/**
+  pay:
+    # 支付订单过期时间（分钟），RocketMQ 延迟消息到期后自动关闭
+    expire-minutes: ${PAY_EXPIRE_MINUTES:30}
+    # 延迟级别：16=30分钟（1s 5s 10s 30s 1m 2m ... 10m 20m 30m）
+    close-delay-level: ${PAY_CLOSE_DELAY_LEVEL:16}
+    # 渠道未配置沙箱密钥时启用内置模拟收银台，演示完整支付闭环
+    mock-enabled: ${PAY_MOCK_ENABLED:true}
+    alipay-notify-url: ${ALIPAY_NOTIFY_URL:http://localhost:10010/pay/callback/alipay}
+    alipay-return-url: ${ALIPAY_RETURN_URL:http://localhost:10010/pay/mock/cashier}
+  internal:
+    token: ${INTERNAL_TOKEN:mallx-internal-token}
+  jwt:
+    secret: ${JWT_SECRET:mallx-jwt-secret-2026}
+
+logging:
+  level:
+    root: info
+    com.mallx: debug

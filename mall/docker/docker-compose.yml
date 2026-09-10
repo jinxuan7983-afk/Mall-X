@@ -1,0 +1,170 @@
+version: "3.8"
+
+# Mall-X 后端依赖中间件：MySQL / Redis / Nacos / RocketMQ
+# 用法：docker compose up -d        （仅中间件）
+#       docker compose --profile app up -d   （中间件 + 后端微服务）
+services:
+  mysql:
+    image: mysql:8.0.36
+    container_name: mallx-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      TZ: Asia/Shanghai
+    ports:
+      - "${MYSQL_HOST_PORT:-3306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # 按文档要求的脚本文件名挂载，并用序号保证执行顺序：建库→建表→初始化数据
+      - ../sql/mallDb.sql:/docker-entrypoint-initdb.d/01-mallDb.sql:ro
+      - ../sql/mallTable.sql:/docker-entrypoint-initdb.d/02-mallTable.sql:ro
+      - ../sql/mallInsert.sql:/docker-entrypoint-initdb.d/03-mallInsert.sql:ro
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_general_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-uroot", "-proot123"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: mallx-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  nacos:
+    image: nacos/nacos-server:v2.3.2
+    container_name: mallx-nacos
+    environment:
+      MODE: standalone
+      NACOS_AUTH_ENABLE: "false"
+      JVM_XMS: 256m
+      JVM_XMX: 512m
+    ports:
+      - "8848:8848"
+      - "9848:9848"
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8848/nacos/v1/console/health/readiness"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  rocketmq-namesrv:
+    image: apache/rocketmq:5.3.2
+    container_name: mallx-rocketmq-namesrv
+    command: sh mqnamesrv
+    ports:
+      - "9876:9876"
+    environment:
+      JAVA_OPT_EXT: -Xms256m -Xmx256m
+
+  rocketmq-broker:
+    image: apache/rocketmq:5.3.2
+    container_name: mallx-rocketmq-broker
+    command: sh mqbroker -n rocketmq-namesrv:9876 -c /home/rocketmq/conf/broker.conf
+    depends_on:
+      - rocketmq-namesrv
+    ports:
+      - "10911:10911"
+      - "10909:10909"
+    environment:
+      JAVA_OPT_EXT: -Xms256m -Xmx512m
+    configs:
+      - source: broker-conf
+        target: /home/rocketmq/conf/broker.conf
+
+  # 可选：RocketMQ 控制台 http://localhost:8180
+  rocketmq-dashboard:
+    image: apacherocketmq/rocketmq-dashboard:1.0.0
+    container_name: mallx-rocketmq-dashboard
+    depends_on:
+      - rocketmq-namesrv
+    ports:
+      - "8180:8080"
+    environment:
+      JAVA_OPTS: -Drocketmq.namesrv.addr=rocketmq-namesrv:9876
+    profiles: ["dashboard"]
+
+  # ===== 以下为后端微服务镜像（--profile app 启用，需先 mvn package）=====
+  mall-gateway:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        JAR_FILE: mall-gateway/target/mall-gateway-1.0.0.jar
+    container_name: mallx-gateway
+    depends_on:
+      - mysql
+      - redis
+      - nacos
+      - rocketmq-namesrv
+    ports:
+      - "10010:10010"
+    environment:
+      NACOS_ADDR: nacos:8848
+      MYSQL_HOST: mysql
+      MYSQL_PWD: root123
+      REDIS_HOST: redis
+      ROCKETMQ_ADDR: rocketmq-namesrv:9876
+      ORDER_CLOSE_DELAY_LEVEL: 16
+    profiles: ["app"]
+
+  mall-mgr:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        JAR_FILE: mall-mgr/target/mall-mgr-1.0.0.jar
+    container_name: mallx-mgr
+    depends_on:
+      - mysql
+      - redis
+      - nacos
+      - rocketmq-namesrv
+    ports:
+      - "10020:10020"
+    environment:
+      NACOS_ADDR: nacos:8848
+      MYSQL_HOST: mysql
+      MYSQL_PWD: root123
+      REDIS_HOST: redis
+      ROCKETMQ_ADDR: rocketmq-namesrv:9876
+      ORDER_CLOSE_DELAY_LEVEL: 16
+    profiles: ["app"]
+
+  mall-alipay:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        JAR_FILE: mall-alipay/target/mall-alipay-1.0.0.jar
+    container_name: mallx-alipay
+    depends_on:
+      - mysql
+      - redis
+      - nacos
+      - rocketmq-namesrv
+    ports:
+      - "10030:10030"
+    environment:
+      NACOS_ADDR: nacos:8848
+      MYSQL_HOST: mysql
+      MYSQL_PWD: root123
+      REDIS_HOST: redis
+      ROCKETMQ_ADDR: rocketmq-namesrv:9876
+      PAY_CLOSE_DELAY_LEVEL: 16
+    profiles: ["app"]
+
+volumes:
+  mysql-data:
+  redis-data:
+
+configs:
+  broker-conf:
+    file: ./broker.conf

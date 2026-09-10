@@ -1,0 +1,350 @@
+/* Mall·X 设计令牌:朱红品牌色 + 墨色文字 + 宣纸底,账本式数字排版 */
+:root {
+  --mx-red: #e23a2e;
+  --mx-red-deep: #b32218;
+  --mx-red-tint: #fdeeec;
+  --mx-ink: #231f1c;
+  --mx-ink-2: #55504a;
+  --mx-ink-3: #8c847c;
+  --mx-line: #e8e4de;
+  --mx-paper: #f6f5f2;
+  --mx-card: #ffffff;
+  --mx-amber: #c07c16;
+  --mx-green: #2f7d4f;
+  --mx-gold: #a8863d;
+
+  --mx-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+
+  --mx-side: #23211e;
+  --mx-side-2: #312e29;
+
+  --mx-radius: 4px;
+  --mx-radius-lg: 10px;
+  --mx-shadow: 0 1px 2px rgba(35, 31, 28, 0.05), 0 6px 24px rgba(35, 31, 28, 0.06);
+  --mx-shadow-lg: 0 2px 6px rgba(35, 31, 28, 0.04), 0 16px 40px rgba(35, 31, 28, 0.1);
+  --mx-row-hover: #faf8f4;
+  --mx-ring: 0 0 0 3px rgba(226, 58, 46, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--mx-font);
+  color: var(--mx-ink);
+  background: var(--mx-paper);
+  -webkit-font-smoothing: antialiased;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* 金额:tabular 数字,右对齐场景由调用方控制 */
+.num {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+.price {
+  font-variant-numeric: tabular-nums;
+  color: var(--mx-red);
+  font-weight: 600;
+}
+
+.price .yen {
+  font-size: 0.62em;
+  font-weight: 500;
+  margin-right: 2px;
+}
+
+/* Element Plus 主题变量对齐 */
+.el-button--primary {
+  --el-button-bg-color: var(--mx-red);
+  --el-button-border-color: var(--mx-red);
+  --el-button-hover-bg-color: var(--mx-red-deep);
+  --el-button-hover-border-color: var(--mx-red-deep);
+  --el-button-active-bg-color: var(--mx-red-deep);
+  --el-button-active-border-color: var(--mx-red-deep);
+}
+
+.el-menu--horizontal > .el-menu-item.is-active,
+.el-tabs__item.is-active {
+  color: var(--mx-red);
+}
+
+.el-pagination.is-background .el-pager li.is-active {
+  background: var(--mx-red);
+  color: #fff;
+}
+
+/* 表格密度与对齐 */
+.el-table .cell {
+  font-variant-numeric: tabular-nums;
+}
+
+.el-table th.el-table__cell {
+  background: var(--mx-paper) !important;
+  color: var(--mx-ink-2);
+  font-weight: 500;
+}
+
+/* 侧栏菜单深色定制 */
+.mx-side .el-menu {
+  background: transparent;
+  border-right: none;
+}
+
+.mx-side .el-menu-item,
+.mx-side .el-sub-menu__title {
+  color: #b5aea6;
+  height: 44px;
+  line-height: 44px;
+}
+
+.mx-side .el-menu-item:hover,
+.mx-side .el-sub-menu__title:hover {
+  background: var(--mx-side-2);
+  color: #fff;
+}
+
+.mx-side .el-menu-item.is-active {
+  color: #fff;
+  background: var(--mx-red);
+}
+
+/* 通用工具类 */
+.mx-card {
+  background: var(--mx-card);
+  border: 1px solid var(--mx-line);
+  border-radius: var(--mx-radius);
+}
+
+.mx-page-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 16px;
+}
+
+.mx-toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.mx-stat {
+  padding: 18px 20px;
+}
+
+.mx-stat .label {
+  font-size: 13px;
+  color: var(--mx-ink-3);
+}
+
+.mx-stat .value {
+  font-size: 26px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  margin-top: 4px;
+}
+
+.mx-stat .value.price {
+  color: var(--mx-red);
+}
+
+.mx-empty {
+  padding: 48px 0;
+  text-align: center;
+  color: var(--mx-ink-3);
+}
+
+/* 滚动条 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d5d0c9;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #bfb9b0;
+}
+
+/* ============================================================
+ * 全局体验增强(所有页面共享,不改变任何交互逻辑)
+ * ============================================================ */
+
+/* 键盘可达性:焦点环统一品牌色 */
+:focus-visible {
+  outline: 2px solid rgba(226, 58, 46, 0.55);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ---------- Element Plus 视觉统一 ---------- */
+
+/* 按钮:圆角 + 悬浮微升 */
+.el-button {
+  border-radius: 6px;
+  transition: transform 0.15s, box-shadow 0.15s, background-color 0.15s, border-color 0.15s,
+    color 0.15s;
+}
+
+.el-button--primary:not(.is-text):not(.is-link) {
+  box-shadow: 0 2px 8px rgba(226, 58, 46, 0.18);
+}
+
+.el-button--primary:not(.is-disabled):not(.is-text):not(.is-link):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 14px rgba(226, 58, 46, 0.24);
+}
+
+/* 输入类组件:圆角 + 聚焦品牌色光晕 */
+.el-input__wrapper,
+.el-textarea__inner,
+.el-select__wrapper {
+  border-radius: 6px;
+}
+
+.el-input__wrapper.is-focus,
+.el-select__wrapper.is-focused,
+.el-textarea__inner:focus {
+  box-shadow: var(--mx-ring) !important;
+}
+
+/* 表格:行悬浮暖纸色 + 表头字重统一 + 圆角容器 */
+.el-table {
+  --el-table-row-hover-bg-color: var(--mx-row-hover);
+  border-radius: var(--mx-radius-lg);
+}
+
+.el-table th.el-table__cell {
+  font-size: 12.5px;
+  letter-spacing: 0.02em;
+}
+
+.el-table .el-table__row {
+  transition: background-color 0.15s;
+}
+
+/* 对话框:大圆角 + 柔和投影 */
+.el-dialog {
+  border-radius: 14px;
+  box-shadow: var(--mx-shadow-lg) !important;
+}
+
+.el-dialog__header {
+  border-bottom: 1px solid var(--mx-line);
+  margin-right: 0;
+  padding-bottom: 14px;
+}
+
+.el-dialog__title {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* 抽屉圆角 */
+.el-drawer {
+  border-radius: 14px 0 0 14px;
+}
+
+/* 标签圆角化 */
+.el-tag {
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+/* 分页按钮圆角 + 悬浮 */
+.el-pagination.is-background .el-pager li,
+.el-pagination.is-background .btn-prev,
+.el-pagination.is-background .btn-next {
+  border-radius: 6px;
+}
+
+.el-pagination.is-background .el-pager li:hover {
+  color: var(--mx-red);
+}
+
+/* 消息提示/确认框圆角 */
+.el-message,
+.el-message-box {
+  border-radius: 10px;
+}
+
+/* Loading 遮罩柔和化 */
+.el-loading-mask {
+  backdrop-filter: blur(1px);
+}
+
+/* ---------- 全局微动效 ---------- */
+
+/* 路由切换过渡(layouts 中 <transition name="mx-fade"> 使用) */
+.mx-fade-enter-active,
+.mx-fade-leave-active {
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.mx-fade-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.mx-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+/* 通用进场动画(卡片/列表容器可直接引用) */
+@keyframes mx-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 统计卡:悬浮呼吸感(工作台/看板) */
+.mx-stat {
+  transition: transform 0.2s, box-shadow 0.2s;
+  border-radius: var(--mx-radius-lg);
+}
+
+.mx-stat:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--mx-shadow-lg);
+}
+
+/* 空状态:图标化提示 */
+.mx-empty {
+  font-size: 13.5px;
+  letter-spacing: 0.02em;
+}
+
+.mx-empty::before {
+  content: '◎';
+  display: block;
+  font-size: 30px;
+  color: #d8d2ca;
+  margin-bottom: 10px;
+}

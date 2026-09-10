@@ -1,0 +1,8 @@
+# 根目录级忽略(mall/ 内规则见 mall/.gitignore)
+*.zip
+/*.yaml
+.playwright-cli/
+.workbuddy/
+docker/mysql-data/
+mysql-data/
+test-results/*.png
