@@ -167,9 +167,19 @@ with sync_playwright() as p:
         else:
             page.goto(BASE + "/my/orders", wait_until="networkidle", timeout=20000)
         page.wait_for_load_state("networkidle", timeout=20000)
-        page.wait_for_timeout(800)
+        # 等待订单卡片渲染完成(列表+明细为多次异步请求)
+        try:
+            page.locator(".order").first.wait_for(state="visible", timeout=10000)
+        except Exception:
+            pass
         step("我的订单可见", page.locator(".order").count() > 0, f"rows={page.locator('.order').count()}")
-        step("订单状态为待发货", page.locator(".order .el-tag", has_text="待发货").count() > 0)
+        # 等待 MQ 驱动订单状态翻待发货(StateTag 组件)
+        try:
+            page.locator(".order .state-tag", has_text="待发货").first.wait_for(state="visible", timeout=30000)
+            state_ok = True
+        except Exception:
+            state_ok = False
+        step("订单状态为待发货", state_ok)
         page.screenshot(path=f"{OUT}\\08_my_orders.png", full_page=True)
     except Exception:
         traceback.print_exc(); step("我的订单", False, "exception")

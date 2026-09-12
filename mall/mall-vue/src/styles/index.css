@@ -25,6 +25,14 @@
   --mx-shadow-lg: 0 2px 6px rgba(35, 31, 28, 0.04), 0 16px 40px rgba(35, 31, 28, 0.1);
   --mx-row-hover: #faf8f4;
   --mx-ring: 0 0 0 3px rgba(226, 58, 46, 0.12);
+
+  /* 玻璃拟态令牌(Glassmorphism):深色画布上的毛玻璃层 */
+  --mx-glass-fill: rgba(255, 255, 255, 0.08);
+  --mx-glass-fill-strong: rgba(255, 255, 255, 0.14);
+  --mx-glass-border: 1px solid rgba(255, 255, 255, 0.22);
+  --mx-glass-blur: 14px;
+  --mx-glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  --mx-glass-radius: 16px;
 }
 
 * {
@@ -33,6 +41,7 @@
 
 html,
 body {
+  height: 100%;
   margin: 0;
   padding: 0;
   font-family: var(--mx-font);
@@ -41,10 +50,14 @@ body {
   -webkit-font-smoothing: antialiased;
   font-size: 14px;
   line-height: 1.6;
+  /* 锁定文档级滚动：滚动统一由各布局的内容区承担，
+     空白区域不出现纵向滚动条/下拉行为（内容不足一屏时无滚动条） */
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 #app {
-  min-height: 100vh;
+  height: 100%;
 }
 
 a {
@@ -116,7 +129,7 @@ a {
 
 .mx-side .el-menu-item:hover,
 .mx-side .el-sub-menu__title:hover {
-  background: var(--mx-side-2);
+  background: rgba(255, 255, 255, 0.12);
   color: #fff;
 }
 
@@ -347,4 +360,236 @@ a {
   font-size: 30px;
   color: #d8d2ca;
   margin-bottom: 10px;
+}
+
+/* ============================================================
+ * 玻璃拟态(Glassmorphism)
+ * 规范来源:glassmorphism 实现指南(2025)+ dashboard 落地原则
+ *  - 框架玻璃化、数据保持实体:玻璃只用于 chrome 层(侧栏/顶栏/
+ *    统计卡/装饰卡),表格与密集数字置于近不透明表面
+ *  - blur 12~16px;Safari 需 -webkit- 前缀;@supports 降级
+ * ============================================================ */
+
+/* 深色画布上的玻璃卡(hero 卖点卡/侧栏菜单等) */
+.mx-glass {
+  background: var(--mx-glass-fill);
+  -webkit-backdrop-filter: blur(var(--mx-glass-blur)) saturate(150%);
+  backdrop-filter: blur(var(--mx-glass-blur)) saturate(150%);
+  border: var(--mx-glass-border);
+  border-radius: var(--mx-glass-radius);
+  box-shadow: var(--mx-glass-shadow);
+}
+
+/* 浅色画布上的玻璃卡(顶栏/浅色顶盖) */
+.mx-glass-light {
+  background: rgba(255, 255, 255, 0.72);
+  -webkit-backdrop-filter: blur(var(--mx-glass-blur)) saturate(160%);
+  backdrop-filter: blur(var(--mx-glass-blur)) saturate(160%);
+}
+
+/* 固定装饰光斑:让玻璃"有东西可透",不随滚动重绘 */
+.mx-aurora {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  pointer-events: none;
+  will-change: opacity;
+}
+
+/* 浏览器不支持 backdrop-filter 时:提升填充度保可读性 */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .mx-glass {
+    background: rgba(255, 255, 255, 0.85);
+  }
+
+  .mx-glass-light {
+    background: rgba(255, 255, 255, 0.94);
+  }
+}
+
+/* 对话框:浅玻璃(下方为页面内容,模糊安全) */
+.el-dialog {
+  background: rgba(255, 255, 255, 0.9);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  backdrop-filter: blur(16px) saturate(160%);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .el-dialog {
+    background: #fff;
+  }
+}
+
+/* ============================================================
+ * 业务页面统一规范(商户/管理/商城全部列表与表单页)
+ * ============================================================ */
+
+/* 表格:白卡片化(页面底为宣纸,表格需浮起为实体面,保证数据可读) */
+.el-table {
+  background: var(--mx-card);
+  border: 1px solid var(--mx-line);
+  box-shadow: 0 1px 2px rgba(35, 31, 28, 0.03);
+  overflow: hidden;
+}
+
+.el-table--border {
+  border-color: var(--mx-line);
+}
+
+.el-table--border::after,
+.el-table--border .el-table__inner-wrapper::after {
+  background-color: var(--mx-line);
+}
+
+.el-table td.el-table__cell,
+.el-table th.el-table__cell.is-leaf {
+  border-bottom-color: #f0ece6;
+}
+
+/* 表头:更轻的纸色 + 底部实线区分 */
+.el-table th.el-table__cell {
+  background: #faf9f6 !important;
+  border-bottom: 1px solid var(--mx-line) !important;
+}
+
+/* 斑马纹:极淡,避免与 hover 冲突 */
+.el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell {
+  background: #fcfbf9;
+}
+
+/* 表格空状态 */
+.el-table__empty-block {
+  min-height: 200px;
+}
+
+.el-table__empty-text {
+  color: var(--mx-ink-3);
+  font-size: 13.5px;
+  line-height: 2;
+}
+
+/* 单元格内文字与数字对齐(金额 tabular) */
+.el-table .cell {
+  color: var(--mx-ink);
+  line-height: 1.5;
+}
+
+/* 分页:统一右对齐与上间距 */
+.el-pagination {
+  justify-content: flex-end;
+  margin-top: 16px;
+  --el-pagination-button-bg-color: #fff;
+}
+
+/* 工具栏:与表格卡片拉开层次 */
+.mx-toolbar {
+  gap: 10px;
+}
+
+.mx-toolbar .el-input__wrapper,
+.mx-toolbar .el-select__wrapper {
+  background: var(--mx-card);
+}
+
+/* 表单:label 与必填星号统一 */
+.el-form-item__label {
+  color: var(--mx-ink-2);
+  font-weight: 500;
+}
+
+.el-form-item.is-required:not(.is-no-asterisk) > .el-form-item__label:before {
+  color: var(--mx-red);
+}
+
+/* 步骤条(退款进度/流程引导) */
+.el-steps .el-step__title {
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.el-steps .el-step__description {
+  font-size: 12px;
+}
+
+/* 描述列表(详情抽屉) */
+.el-descriptions__label {
+  color: var(--mx-ink-3) !important;
+  font-weight: 500 !important;
+}
+
+/* 提示条圆角统一 */
+.el-alert {
+  border-radius: var(--mx-radius-lg);
+}
+
+/* 统计卡内的数字与标签节奏(工作台/看板) */
+.mx-stat .value {
+  letter-spacing: 0.01em;
+}
+
+/* 页面主标题(部分页面内嵌标题) */
+.mx-page-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 17px;
+  letter-spacing: 0.02em;
+}
+
+.mx-page-title::before {
+  content: '';
+  width: 3px;
+  height: 16px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--mx-red), var(--mx-red-deep));
+}
+
+/* 图表卡头:统一品牌竖条(工作台/看板/统计页) */
+.chart-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.chart-head::before {
+  content: '';
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--mx-red), var(--mx-red-deep));
+}
+
+/* 统计卡强调态(金额类):顶部渐变描边 */
+.mx-stat {
+  position: relative;
+  overflow: hidden;
+}
+
+.mx-stat.accent::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--mx-red), rgba(226, 58, 46, 0.15));
+}
+
+/* 统计卡右上角图标 */
+.mx-stat .stat-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mx-stat .stat-ico {
+  font-size: 20px;
+  color: #ded8d0;
+  transition: color 0.2s, transform 0.2s;
+}
+
+.mx-stat:hover .stat-ico {
+  color: var(--mx-red);
+  transform: translateY(-1px);
 }

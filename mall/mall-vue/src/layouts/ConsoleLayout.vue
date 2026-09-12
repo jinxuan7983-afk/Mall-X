@@ -1,5 +1,8 @@
 <template>
   <el-container class="console">
+    <!-- 玻璃底座:深墨画布 + 品牌色光斑(固定,不随滚动重绘) -->
+    <div class="aurora aurora-a" aria-hidden="true"></div>
+    <div class="aurora aurora-b" aria-hidden="true"></div>
     <el-aside width="212px" class="mx-side side">
       <router-link to="/" class="brand">
         <span class="seal">M·X</span>
@@ -82,12 +85,12 @@ const mchMenus = [
 const adminMenus = [
   { path: '/admin', title: '数据看板', icon: 'DataBoard' },
   { path: '/admin/merchants', title: '商户审核', icon: 'Shop' },
+  { path: '/admin/goods', title: '商品管理', icon: 'Goods' },
   { path: '/admin/pay', title: '支付订单', icon: 'Tickets' },
   { path: '/admin/refunds', title: '退款审核', icon: 'RefreshLeft' },
   { path: '/admin/channels', title: '渠道配置', icon: 'Connection' },
   { path: '/admin/withdraws', title: '提现审核', icon: 'Wallet' },
   { path: '/admin/categories', title: '类目管理', icon: 'Menu' },
-  { path: '/admin/operators', title: '操作员管理', icon: 'UserFilled' },
   { path: '/admin/logs', title: '操作日志', icon: 'Document' },
 ]
 
@@ -106,17 +109,63 @@ function quit() {
 </script>
 
 <style scoped>
+/* 玻璃拟态画布:深墨渐变 + 品牌色光斑,让侧栏/顶栏玻璃"有东西可透" */
 .console {
-  min-height: 100vh;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+  background: linear-gradient(155deg, #292520 0%, var(--mx-side) 45%, #1b1917 100%);
 }
 
+/* 内层容器:解除 flex 自动最小尺寸(min-height:auto)限制,
+   保证窄屏(主轴垂直)下内容不会把容器撑破视口 —— 滚动只发生在 .main 内 */
+.console :deep(.el-container) {
+  min-height: 0;
+}
+
+/* 光斑:绝对定位于画布,脱离 flex 流,不参与布局 */
+.aurora {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  pointer-events: none;
+}
+
+.aurora-a {
+  width: 460px;
+  height: 460px;
+  top: -160px;
+  left: -120px;
+  background: radial-gradient(circle, rgba(226, 58, 46, 0.28), transparent 70%);
+  z-index: 0;
+}
+
+.aurora-b {
+  width: 420px;
+  height: 420px;
+  bottom: -180px;
+  right: -140px;
+  background: radial-gradient(circle, rgba(168, 134, 61, 0.2), transparent 70%);
+  z-index: 0;
+}
+
+/* 侧栏:毛玻璃浮于画布之上(随画布锁定高度,不参与滚动) */
 .side {
-  background: var(--mx-side);
+  height: 100%;
   display: flex;
   flex-direction: column;
-  position: sticky;
-  top: 0;
-  height: 100vh;
+  background: var(--mx-glass-fill);
+  -webkit-backdrop-filter: blur(var(--mx-glass-blur)) saturate(150%);
+  backdrop-filter: blur(var(--mx-glass-blur)) saturate(150%);
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+  z-index: 2;
+}
+
+/* 不支持 backdrop-filter:侧栏回退为近实体深色,保文字对比度 */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .side {
+    background: rgba(30, 27, 24, 0.96);
+  }
 }
 
 .brand {
@@ -176,15 +225,23 @@ function quit() {
 }
 
 .head {
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(8px);
-  border-bottom: 1px solid var(--mx-line);
+  flex: none;
+  background: rgba(255, 255, 255, 0.72);
+  -webkit-backdrop-filter: blur(var(--mx-glass-blur)) saturate(160%);
+  backdrop-filter: blur(var(--mx-glass-blur)) saturate(160%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.5);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  position: sticky;
-  top: 0;
+  position: relative;
   z-index: 10;
+}
+
+/* 不支持 backdrop-filter:顶栏回退为高填充白,保内容可读 */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .head {
+    background: rgba(255, 255, 255, 0.95);
+  }
 }
 
 .title {
@@ -224,5 +281,86 @@ function quit() {
   width: 100%;
   margin: 0 auto;
   box-sizing: border-box;
+  position: relative;
+  z-index: 1;
+  /* 内容区为唯一滚动容器:内容不足一屏时无滚动条,内容超高时区内滚动 */
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  min-height: 0;
+}
+
+/* ---------- 小屏自适应:侧栏转为顶部横向菜单,内容区独占剩余高度 ---------- */
+@media (max-width: 900px) {
+  .console {
+    flex-direction: column;
+  }
+
+  .side {
+    width: 100% !important;
+    height: auto;
+    flex: none;
+    flex-direction: row;
+    align-items: center;
+    border-right: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  }
+
+  .brand {
+    display: none;
+  }
+
+  .el-menu {
+    flex: 1;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 6px 8px;
+    gap: 2px;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .el-menu::-webkit-scrollbar {
+    display: none;
+  }
+
+  .el-menu :deep(.el-menu-item) {
+    flex: 0 0 auto;
+    height: 38px;
+    line-height: 38px;
+    padding: 0 12px;
+    margin-bottom: 0;
+    font-size: 13px;
+  }
+
+  .el-menu :deep(.el-menu-item:hover) {
+    transform: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .head {
+    padding: 0 12px;
+  }
+
+  .title {
+    font-size: 14px;
+  }
+
+  .who :deep(.el-divider) {
+    display: none;
+  }
+
+  .who .back-home,
+  .who .name {
+    display: none;
+  }
+
+  .main {
+    padding: 14px 12px 20px;
+  }
 }
 </style>

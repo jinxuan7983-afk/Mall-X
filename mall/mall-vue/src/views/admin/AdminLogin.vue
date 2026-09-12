@@ -81,7 +81,7 @@
             密码 MD5 加盐存储 · 接口全链路签名防篡改
           </div>
         </div>
-        <div class="form-foot">© 2026 Mall·X · 行业工程实践课程项目</div>
+        <div class="form-foot">© 2026 Mall·X</div>
       </div>
     </main>
   </div>
@@ -109,7 +109,7 @@ async function submit() {
   loading.value = true
   try {
     const r = await adminLogin(form.username, form.password)
-    session.setAdmin({ username: form.username, realName: r.realName, role: r.role })
+    session.setAdmin({ username: form.username, realName: r.realName, role: r.role, token: r.token })
     router.push('/admin')
   } finally {
     loading.value = false
@@ -119,7 +119,9 @@ async function submit() {
 
 <style scoped>
 .auth {
-  min-height: 100vh;
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   display: grid;
   grid-template-columns: minmax(440px, 46%) 1fr;
   background: var(--mx-paper);
@@ -231,10 +233,12 @@ async function submit() {
   align-items: flex-start;
   gap: 14px;
   padding: 14px 16px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.055);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(4px);
+  border-radius: 12px;
+  background: var(--mx-glass-fill);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  backdrop-filter: blur(10px) saturate(140%);
+  border: var(--mx-glass-border);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.22);
 }
 
 .pt-ico {

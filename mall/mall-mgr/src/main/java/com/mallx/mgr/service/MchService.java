@@ -23,27 +23,43 @@ import org.springframework.stereotype.Service;
 public class MchService {
 
     private final MchMapper mchMapper;
+    private final CaptchaService captchaService;
 
     @Value("${mallx.jwt.secret:mallx-jwt-secret-2026}")
     private String jwtSecret;
 
-    /** 商户注册：生成商户唯一编号，初始状态待审核 */
+    /** 商户注册：图形验证码校验 → 生成商户唯一编号，初始状态待审核 */
     public R register(RegisterReq req) {
+        // 图形验证码：一次性校验（Redis 5 分钟过期，校验后即删除）
+        captchaService.verifyAndConsume(req.getCaptchaKey(), req.getCaptchaCode());
         Long exists = mchMapper.selectCount(Wrappers.<Mch>lambdaQuery()
                 .eq(Mch::getUsername, req.getUsername()));
         if (exists != null && exists > 0) {
             throw new BizException("商户登录账号已存在");
         }
         Mch mch = new Mch();
-        mch.setShopNum(OrderNoUtil.shopNum());
         mch.setShopName(req.getShopName());
         mch.setShopPhone(req.getShopPhone());
         mch.setShopAddress(req.getShopAddress());
         mch.setUsername(req.getUsername());
         mch.setPassword(md5(req.getPassword()));
         mch.setShopState(MallConstant.MCH_WAIT_AUDIT);
-        mchMapper.insert(mch);
-        return R.ok("商户注册成功，等待审核").set("shopNum", mch.getShopNum());
+        // 短编号碰撞概率极低：唯一索引兜底，冲突时重新生成编号重试
+        for (int attempt = 0; attempt < 3; attempt++) {
+            mch.setShopNum(OrderNoUtil.shopNum());
+            try {
+                mchMapper.insert(mch);
+                return R.ok("商户注册成功，等待审核").set("shopNum", mch.getShopNum());
+            } catch (org.springframework.dao.DuplicateKeyException e) {
+                String detail = String.valueOf(e.getMessage());
+                if (detail.contains("uk_mch_username")) {
+                    // 并发兜底：uk_mch_username 唯一索引冲突时返回友好提示而非 500
+                    throw new BizException("商户登录账号已存在");
+                }
+                // uk_mch_shop_num 冲突：重新生成编号后重试
+            }
+        }
+        throw new BizException("系统繁忙，请稍后重试");
     }
 
     /** 商户登录：返回登录令牌与商户状态 */

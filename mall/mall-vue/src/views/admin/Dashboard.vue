@@ -2,8 +2,11 @@
   <div>
     <el-row :gutter="14">
       <el-col :span="6" v-for="c in cards" :key="c.label">
-        <div class="mx-card mx-stat">
-          <div class="label">{{ c.label }}</div>
+        <div class="mx-card mx-stat" :class="{ accent: c.price }">
+          <div class="stat-top">
+            <div class="label">{{ c.label }}</div>
+            <el-icon class="stat-ico"><component :is="c.icon" /></el-icon>
+          </div>
           <div class="value" :class="{ price: c.price }">{{ c.value }}</div>
         </div>
       </el-col>
@@ -34,10 +37,10 @@ import { useEcharts, chartBase } from '@/composables/useEcharts'
 import type { EChartsOption } from 'echarts'
 
 const cards = ref([
-  { label: '平台累计交易额(元)', value: '—', price: true },
-  { label: '累计交易笔数', value: '—', price: false },
-  { label: '支付渠道数', value: '—', price: false },
-  { label: '今日交易额(元)', value: '—', price: true },
+  { label: '平台累计交易额(元)', value: '—', price: true, icon: 'Money' },
+  { label: '累计交易笔数', value: '—', price: false, icon: 'Tickets' },
+  { label: '支付渠道数', value: '—', price: false, icon: 'Connection' },
+  { label: '今日交易额(元)', value: '—', price: true, icon: 'TrendCharts' },
 ])
 
 const lineEl = ref<HTMLElement>() as Ref<HTMLElement | undefined>
@@ -52,10 +55,10 @@ onMounted(async () => {
   const st = await statisPlatform()
   const today = st.sevenDayData[st.sevenDayData.length - 1]
   cards.value = [
-    { label: '平台累计交易额(元)', value: money(st.totalMoney), price: true },
-    { label: '累计交易笔数', value: String(st.totalCount), price: false },
-    { label: '支付渠道数', value: String(st.channelRatio.length), price: false },
-    { label: '今日交易额(元)', value: money(today?.tradeMoney ?? 0), price: true },
+    { label: '平台累计交易额(元)', value: money(st.totalMoney), price: true, icon: 'Money' },
+    { label: '累计交易笔数', value: String(st.totalCount), price: false, icon: 'Tickets' },
+    { label: '支付渠道数', value: String(st.channelRatio.length), price: false, icon: 'Connection' },
+    { label: '今日交易额(元)', value: money(today?.tradeMoney ?? 0), price: true, icon: 'TrendCharts' },
   ]
   lineOpt.value = {
     ...chartBase,

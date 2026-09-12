@@ -94,18 +94,36 @@ export interface PayOrder {
 
 export type WayCode = 'WECHAT' | 'ALIPAY' | 'UNIONPAY'
 
-/** 退款单:0-审核中 1-退款成功 2-退款失败 */
+/** 退款单:0-待审核 1-处理中 2-已完成 3-已拒绝 */
 export interface RefundOrder {
   refundOrderId: string
   payOrderId: string
+  /** 关联业务订单号(用户端按订单申请时记录) */
+  orderNum?: string | null
   shopNum: string
+  /** 申请用户编号(用户端发起时记录) */
+  userNum?: string | null
   refundMoney: number
   refundReason: string
-  refundState: 0 | 1 | 2
+  /** 凭证图片地址(JSON 数组字符串,前端解析展示) */
+  evidence?: string | null
+  refundState: 0 | 1 | 2 | 3
   channelRefundNo: string | null
   auditRemark: string | null
+  auditTime?: string | null
   refundTime: string | null
   createdAt: string
+}
+
+/** 商户端退款统计概览 */
+export interface RefundStats {
+  waitCount: number
+  processingCount: number
+  successCount: number
+  failCount: number
+  totalCount: number
+  successMoney: number
+  pendingMoney: number
 }
 
 export interface Mch {
@@ -150,15 +168,8 @@ export interface ChannelConfig {
   createdAt: string
 }
 
-export interface AdminUser {
-  username: string
-  realName: string
-  role: 'ADMIN' | 'OPS'
-  state: 0 | 1
-  createdAt: string
-}
-
 export interface OperateLog {
+  id: number
   module: string
   content: string
   operator: string

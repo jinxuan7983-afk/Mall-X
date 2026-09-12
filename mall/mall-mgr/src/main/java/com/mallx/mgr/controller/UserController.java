@@ -8,8 +8,10 @@ import com.mallx.common.jwt.JwtUtil;
 import com.mallx.common.result.R;
 import com.mallx.common.util.OrderNoUtil;
 import com.mallx.mgr.dto.LoginReq;
+import com.mallx.mgr.dto.UserRegisterReq;
 import com.mallx.mgr.entity.User;
 import com.mallx.mgr.mapper.UserMapper;
+import com.mallx.mgr.service.CaptchaService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -27,12 +29,15 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserController {
 
     private final UserMapper userMapper;
+    private final CaptchaService captchaService;
 
     @Value("${mallx.jwt.secret:mallx-jwt-secret-2026}")
     private String jwtSecret;
 
     @PostMapping("/register")
-    public R register(@Valid @RequestBody LoginReq req) {
+    public R register(@Valid @RequestBody UserRegisterReq req) {
+        // 图形验证码：一次性校验（Redis 5 分钟过期，校验后即删除）
+        captchaService.verifyAndConsume(req.getCaptchaKey(), req.getCaptchaCode());
         Long exists = userMapper.selectCount(Wrappers.<User>lambdaQuery().eq(User::getUsername, req.getUsername()));
         if (exists != null && exists > 0) {
             throw new BizException("用户账号已存在");
@@ -42,7 +47,12 @@ public class UserController {
         user.setUsername(req.getUsername());
         user.setPassword(DigestUtil.md5Hex(req.getPassword() + MallConstant.PASSWORD_SALT));
         user.setNickname(req.getUsername());
-        userMapper.insert(user);
+        try {
+            userMapper.insert(user);
+        } catch (org.springframework.dao.DuplicateKeyException e) {
+            // 并发兜底：uk_user_username 唯一索引冲突时返回友好提示而非 500
+            throw new BizException("用户账号已存在");
+        }
         return R.ok("用户注册成功").set("userNum", user.getUserNum());
     }
 

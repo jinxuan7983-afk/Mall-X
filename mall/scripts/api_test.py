@@ -35,13 +35,15 @@ def sign_params(params: dict) -> str:
     return hashlib.md5(raw.encode("utf-8")).hexdigest()
 
 
-def post(path: str, params: dict, use_sign=True) -> dict:
+def post(path: str, params: dict, use_sign=True, headers=None) -> dict:
     body = {k: v for k, v in params.items() if v is not None}
     if use_sign:
         body["sign"] = sign_params(params)
     data = json.dumps(body, ensure_ascii=False).encode("utf-8")
-    req = urllib.request.Request(BASE + path, data=data,
-                                 headers={"Content-Type": "application/json"}, method="POST")
+    hdrs = {"Content-Type": "application/json"}
+    if headers:
+        hdrs.update(headers)
+    req = urllib.request.Request(BASE + path, data=data, headers=hdrs, method="POST")
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
             return json.loads(resp.read().decode("utf-8"))
@@ -50,6 +52,26 @@ def post(path: str, params: dict, use_sign=True) -> dict:
             return json.loads(e.read().decode("utf-8"))
         except Exception:
             return {"id": str(e.code), "message": f"HTTP {e.code}"}
+
+
+def get_json(path: str) -> dict:
+    req = urllib.request.Request(BASE + path, method="GET")
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        try:
+            return json.loads(e.read().decode("utf-8"))
+        except Exception:
+            return {"id": str(e.code), "message": f"HTTP {e.code}"}
+
+
+def fetch_captcha() -> tuple:
+    """获取图形验证码（测试环境 echo-code=true 回显明文），返回 (captchaKey, code)"""
+    r = get_json("/captcha/image")
+    if r.get("id") != "0" or not r.get("code"):
+        raise SystemExit(f"验证码接口不可用（需 echo-code=true）: {r}")
+    return r["captchaKey"], r["code"]
 
 
 def check(name, cond, detail=""):
@@ -70,17 +92,37 @@ print(f"========== Mall-X 接口联调测试  base={BASE} ==========")
 
 # ---------- 1. 商户注册 ----------
 sfx = rand_str()
+phone = "138" + "".join(random.choices(string.digits, k=8))  # 纯数字 11 位手机号
 print("\n[1] 商户管理模块")
+# 图形验证码负向用例：错误验证码必须被拒
+ck_bad, _ = fetch_captcha()
 r = post("/mch/register", {
-    "shopName": f"联调测试商铺{sfx}", "shopPhone": "138" + sfx[:8].ljust(8, "0"),
-    "shopAddress": "测试地址", "username": f"test{sfx}", "password": "123456"})
+    "shopName": f"联调测试商铺{sfx}", "shopPhone": phone,
+    "shopAddress": "测试地址", "username": f"test{sfx}", "password": "123456",
+    "captchaKey": ck_bad, "captchaCode": "0000"})
+check("注册验证码错误被拒", r.get("id") != "0", r)
+
+ck, cc = fetch_captcha()
+r = post("/mch/register", {
+    "shopName": f"联调测试商铺{sfx}", "shopPhone": phone,
+    "shopAddress": "测试地址", "username": f"test{sfx}", "password": "123456",
+    "captchaKey": ck, "captchaCode": cc})
 check("4.1.1 商户注册", r.get("id") == "0" and "shopNum" in r, r)
 shop_num = r.get("shopNum")
 
 # 坏签名必须被拒
 r = post("/mch/register", {"shopName": "x", "shopPhone": "1", "shopAddress": "x",
-                           "username": "bad" + sfx, "password": "1"}, use_sign=False)
+                           "username": "bad" + sfx, "password": "123456",
+                           "captchaKey": ck, "captchaCode": cc}, use_sign=False)
 check("签名缺失被拒绝", r.get("id") != "0", r)
+
+# 手机号格式校验：非 11 位手机号必须被拒
+ck, cc = fetch_captcha()
+r = post("/mch/register", {
+    "shopName": "格式校验商铺", "shopPhone": "12345", "shopAddress": "x",
+    "username": "fmt" + sfx, "password": "123456",
+    "captchaKey": ck, "captchaCode": cc})
+check("商户手机号格式校验", r.get("id") != "0", r)
 
 # ---------- 2. 管理员登录 + 商户审核 ----------
 r = post("/admin/login", {"username": "admin", "password": "123456"}, use_sign=False)
@@ -106,9 +148,17 @@ stock0 = r.get("goods", {}).get("stock", 0)
 
 # ---------- 4. 用户注册 + 下单 ----------
 print("\n[3] 用户购物与下单")
-r = post("/user/register", {"username": "u" + sfx, "password": "123456"})
+ck, cc = fetch_captcha()
+r = post("/user/register", {"username": "u" + sfx, "password": "123456",
+                            "captchaKey": ck, "captchaCode": cc})
 check("用户注册", r.get("id") == "0", r)
 user_num = r.get("userNum")
+
+# 弱密码/短用户名校验：5 位密码必须被拒
+ck, cc = fetch_captcha()
+r = post("/user/register", {"username": "weak" + sfx, "password": "12345",
+                            "captchaKey": ck, "captchaCode": cc})
+check("用户密码长度校验", r.get("id") != "0", r)
 
 r = post("/user/login", {"username": "u" + sfx, "password": "123456"}, use_sign=False)
 check("用户登录", r.get("id") == "0", r)
@@ -192,16 +242,87 @@ r = post("/refund/create", {"payOrderId": pay_order_id, "refundMoney": "99999.00
 check("超额退款被拒", r.get("id") != "0", r)
 
 r = post("/refund/query", {"refundOrderId": refund_order_id, "shopNum": shop_num})
-check("4.4.2 退款查询(审核中)", r.get("refundState") == 0, r)
+check("4.4.2 退款查询(待审核=0)", r.get("refundState") == 0, r)
 
 r = post("/admin/refund/audit", {"refundOrderId": refund_order_id, "auditState": 1})
 check("平台审核通过→渠道退款", r.get("id") == "0", r)
 
 r = post("/refund/query", {"refundOrderId": refund_order_id, "shopNum": shop_num})
-check("退款成功(state=1)", r.get("refundState") == 1, r)
+check("退款已完成(state=2)", r.get("refundState") == 2, r)
 
 r = post("/pay/query", {"shopNum": shop_num, "appId": "mallx-app", "payOrderNum": pay_order_id})
-check("支付单流转已退款(state=2)", r.get("orderState") == 2, r)
+check("部分退款后支付单保持支付成功(未退完不流转)", r.get("orderState") == 0, r)
+
+# ---------- 7. 用户端售后：申请退款（含凭证）→ 商户端审核（同意/拒绝/重新申请） ----------
+print("\n[6.1] 用户端售后 + 商户端审核")
+r = post("/mch/login", {"username": f"test{sfx}", "password": "123456"}, use_sign=False)
+mch_token = r.get("token")
+check("商户登录获取令牌", bool(mch_token), r)
+
+ev = post("/refund/evidence/upload",
+          {"imageBase64": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q=="})
+check("凭证上传返回本系统地址", ev.get("id") == "0" and str(ev.get("url", "")).startswith("/uploads/refund/"), ev)
+
+r = post("/refund/apply", {"orderNum": order_num, "userNum": user_num, "refundMoney": "5.00",
+                           "refundReason": "商品质量问题：外包装破损", "evidence": [ev.get("url")]})
+check("用户端发起退款申请", r.get("id") == "0" and "refundOrderId" in r, r)
+user_refund_id = r.get("refundOrderId")
+
+r = post("/refund/apply", {"orderNum": order_num, "userNum": user_num, "refundMoney": "1.00",
+                           "refundReason": "重复提交"})
+check("同单处理中重复申请被拒", r.get("id") != "0", r)
+
+r = post("/refund/user/list", {"userNum": user_num, "pageNum": 1, "pageSize": 10})
+check("用户端退款记录列表", r.get("id") == "0" and any(
+    x.get("refundOrderId") == user_refund_id for x in (r.get("records") or [])), r.get("total"))
+
+r = post("/refund/detail", {"refundOrderId": user_refund_id, "userNum": user_num})
+check("退款进度详情(待审核=0)", r.get("refund", {}).get("refundState") == 0, r)
+
+r = post("/refund/detail", {"refundOrderId": user_refund_id, "userNum": "U100000000999"})
+check("非申请人查看退款单被拒", r.get("id") != "0", r)
+
+r = post("/refund/mch/list", {"shopNum": shop_num, "pageNum": 1, "pageSize": 10, "refundState": 0})
+check("商户端待处理退款列表", r.get("id") == "0" and r.get("total", 0) >= 1, r)
+
+r = post("/refund/mch/stats", {"shopNum": shop_num})
+check("商户端退款统计", r.get("id") == "0" and r.get("waitCount", 0) >= 1, r)
+
+r = post("/refund/mch/audit", {"refundOrderId": user_refund_id, "auditState": 1, "auditRemark": "无令牌"})
+check("无登录令牌审核被拒", r.get("id") != "0", r)
+
+r = post("/refund/mch/audit", {"refundOrderId": user_refund_id, "auditState": 1, "auditRemark": "越权"},
+         headers={"X-Mch-Token": admin_token})
+check("非商户令牌审核被拒", r.get("id") != "0", r)
+
+r = post("/refund/mch/audit", {"refundOrderId": user_refund_id, "auditState": 1, "auditRemark": "已核实，同意退款"},
+         headers={"X-Mch-Token": mch_token})
+check("商户同意退款→执行渠道退款", r.get("id") == "0", r)
+
+r = post("/refund/detail", {"refundOrderId": user_refund_id, "userNum": user_num})
+refund_rec = r.get("refund", {})
+check("两端状态同步为已完成(2)", refund_rec.get("refundState") == 2, refund_rec)
+check("处理备注已记录", refund_rec.get("auditRemark") == "已核实，同意退款", refund_rec)
+check("渠道退款流水号已写入", bool(refund_rec.get("channelRefundNo")), refund_rec)
+
+# 拒绝流程
+r = post("/refund/apply", {"orderNum": order_num, "userNum": user_num, "refundMoney": "2.00",
+                           "refundReason": "协商不一致"})
+reject_refund_id = r.get("refundOrderId")
+check("第二笔退款申请(2.00)", r.get("id") == "0", r)
+r = post("/refund/mch/audit", {"refundOrderId": reject_refund_id, "auditState": 2,
+                               "auditRemark": "商品已使用，不支持退款"},
+         headers={"X-Mch-Token": mch_token})
+check("商户拒绝退款", r.get("id") == "0", r)
+r = post("/refund/detail", {"refundOrderId": reject_refund_id, "userNum": user_num})
+refund_rec = r.get("refund", {})
+check("拒绝后状态已拒绝(3)且记录备注", refund_rec.get("refundState") == 3
+      and refund_rec.get("auditRemark") == "商品已使用，不支持退款", refund_rec)
+
+# 已拒绝后可重新申请（额度已释放）
+r = post("/refund/apply", {"orderNum": order_num, "userNum": user_num, "refundMoney": "2.00",
+                           "refundReason": "重新协商退款"})
+check("已拒绝后可重新申请", r.get("id") == "0", r)
 
 # ---------- 8. 数据统计 ----------
 print("\n[7] 数据统计模块")
@@ -238,6 +359,112 @@ r = post("/admin/refund/list", {"pageNum": 1, "pageSize": 10})
 check("退款列表", r.get("id") == "0", r)
 r = post("/admin/log/list", {"pageNum": 1, "pageSize": 10})
 check("操作日志", r.get("id") == "0" and r.get("total", 0) >= 1, r)
+
+# ---------- 10.2 管理端各模块删除（仅 ADMIN 可执行） ----------
+print("\n[9.2] 管理端各模块删除")
+
+# 商户：新注册商户（无业务数据）可删；有业务数据的商户禁止删
+ck, cc = fetch_captcha()
+r = post("/mch/register", {"shopName": f"删除测试商铺{sfx}", "shopPhone": "136" + "".join(random.choices(string.digits, k=8)),
+                           "shopAddress": "删除测试地址", "username": f"delmch{sfx}", "password": "123456",
+                           "captchaKey": ck, "captchaCode": cc})
+del_shop = r.get("shopNum")
+check("预置待删商户", r.get("id") == "0", r)
+r = post("/admin/mch/delete", {"shopNum": del_shop})
+check("无登录令牌删除商户被拒", r.get("id") != "0", r)
+r = post("/admin/mch/delete", {"shopNum": del_shop}, headers={"X-Admin-Token": admin_token})
+check("无业务数据的商户可删除", r.get("id") == "0", r)
+r = post("/admin/mch/delete", {"shopNum": shop_num}, headers={"X-Admin-Token": admin_token})
+check("有商品/订单的商户禁止删除", r.get("id") != "0", r)
+
+# 商品：新建商品可删；被订单引用的商品禁止删
+r = post("/goods/create", {"goodsName": f"删除测试商品{sfx}", "shopNum": "SH417826",
+                           "categoryId": 1, "price": "9.90", "stock": 5})
+del_goods = r.get("goodsNum")
+check("预置待删商品", r.get("id") == "0", r)
+r = post("/admin/goods/delete", {"goodsNum": del_goods}, headers={"X-Admin-Token": admin_token})
+check("无订单引用的商品可删除", r.get("id") == "0", r)
+r = post("/admin/goods/delete", {"goodsNum": "G728415"}, headers={"X-Admin-Token": admin_token})
+check("被订单引用的商品禁止删除", r.get("id") != "0", r)
+
+# 支付订单：待支付单可删；支付成功单禁止删
+r = post("/pay/create", {"shopNum": "SH417826", "shopName": "星选数码旗舰店", "appId": "mallx-app",
+                         "wayCode": "WECHAT", "payMoney": "1.00", "subject": "删除测试支付单",
+                         "userNum": "U1000000001", "orderNum": "SO" + sfx + "D"})
+del_pay = r.get("payOrderId")
+check("预置待删支付单", r.get("id") == "0", r)
+r = post("/admin/pay/delete", {"payOrderId": del_pay}, headers={"X-Admin-Token": admin_token})
+check("待支付订单可删除", r.get("id") == "0", r)
+r = post("/admin/pay/list", {"pageNum": 1, "pageSize": 5, "orderState": 0})
+paid = ((r.get("records") or [{}])[0] or {}).get("payOrderId")
+r = post("/admin/pay/delete", {"payOrderId": paid}, headers={"X-Admin-Token": admin_token})
+check("支付成功订单禁止删除", r.get("id") != "0", r)
+
+# 退款单：审核中禁止删；驳回(失败)后可删
+r = post("/pay/create", {"shopNum": "SH417826", "shopName": "星选数码旗舰店", "appId": "mallx-app",
+                         "wayCode": "WECHAT", "payMoney": "2.00", "subject": "删除测试退款单",
+                         "userNum": "U1000000001", "orderNum": "SO" + sfx + "R"})
+pay_r = r.get("payOrderId")
+post("/pay/callback", {"payOrderId": pay_r, "channelOrderNo": "CHDEL" + sfx, "payState": "0",
+                       "payTime": time.strftime("%Y-%m-%d %H:%M:%S")})
+r = post("/refund/create", {"payOrderId": pay_r, "refundMoney": "0.50", "refundReason": "删除测试",
+                            "shopNum": "SH417826"})
+del_refund = r.get("refundOrderId")
+check("预置待删退款单", r.get("id") == "0", r)
+r = post("/admin/refund/delete", {"refundOrderId": del_refund}, headers={"X-Admin-Token": admin_token})
+check("待审核退款单禁止删除", r.get("id") != "0", r)
+r = post("/admin/refund/audit", {"refundOrderId": del_refund, "auditState": 2, "auditRemark": "删除测试驳回"})
+check("退款单已驳回", r.get("id") == "0", r)
+r = post("/admin/refund/delete", {"refundOrderId": del_refund}, headers={"X-Admin-Token": admin_token})
+check("已拒绝退款单可删除", r.get("id") == "0", r)
+
+# 渠道配置：新建测试渠道可删
+r = post("/admin/channel/config", {"wayCode": "TESTPAY", "channelName": "删除测试渠道",
+                                   "switchStatus": 1, "baseRate": "0.0060"})
+check("预置待删渠道", r.get("id") == "0", r)
+r = post("/admin/channel/delete", {"wayCode": "TESTPAY"}, headers={"X-Admin-Token": admin_token})
+check("渠道配置可删除", r.get("id") == "0", r)
+
+# 提现单：审核中禁止删；驳回后可删
+r = post("/fund/withdraw/create", {"shopNum": shop_num, "money": "0.01"})
+del_wd = r.get("withdrawNo")
+check("预置待删提现单", r.get("id") == "0", r)
+r = post("/admin/withdraw/delete", {"withdrawNo": del_wd}, headers={"X-Admin-Token": admin_token})
+check("审核中提现单禁止删除", r.get("id") != "0", r)
+r = post("/admin/withdraw/audit", {"withdrawNo": del_wd, "state": 2, "remark": "删除测试驳回"})
+check("提现单已驳回", r.get("id") == "0", r)
+r = post("/admin/withdraw/delete", {"withdrawNo": del_wd}, headers={"X-Admin-Token": admin_token})
+check("已驳回提现单可删除", r.get("id") == "0", r)
+
+# 类目：空类目可删；有商品引用的类目禁止删
+r = post("/admin/category/save", {"categoryName": f"删除测试类目{sfx}", "parentId": 0, "sort": 99})
+del_cat = r.get("categoryId")
+check("预置待删类目", r.get("id") == "0", r)
+r = post("/admin/category/delete", {"categoryId": del_cat}, headers={"X-Admin-Token": admin_token})
+check("空类目可删除", r.get("id") == "0", r)
+r = post("/admin/goods/list", {"pageNum": 1, "pageSize": 1})
+gcid = ((r.get("records") or [{}])[0] or {}).get("categoryId")
+r = post("/admin/category/delete", {"categoryId": gcid}, headers={"X-Admin-Token": admin_token})
+check("有商品引用的类目禁止删除", r.get("id") != "0", r)
+
+# 操作日志：单条可删，删除动作自身写入新审计日志
+r = post("/admin/log/list", {"pageNum": 1, "pageSize": 1})
+log_id = ((r.get("records") or [{}])[0] or {}).get("id")
+check("预置待删日志", bool(log_id), r)
+r = post("/admin/log/delete", {"id": log_id}, headers={"X-Admin-Token": admin_token})
+check("操作日志可删除", r.get("id") == "0", r)
+r = post("/admin/log/delete", {"id": log_id}, headers={"X-Admin-Token": admin_token})
+check("重复删除被拒", r.get("id") != "0", r)
+
+# ---------- 10.3 全额退完支付单流转（退款扣减商户余额，置于提现用例之后） ----------
+print("\n[9.3] 全额退完支付单流转")
+r = post("/refund/create", {"payOrderId": pay_order_id, "refundMoney": "90.60",
+                            "refundReason": "剩余金额全额退款", "shopNum": shop_num})
+check("发起剩余额度退款(90.60)", r.get("id") == "0", r)
+r = post("/admin/refund/audit", {"refundOrderId": r.get("refundOrderId"), "auditState": 1})
+check("平台审核剩余退款", r.get("id") == "0", r)
+r = post("/pay/query", {"shopNum": shop_num, "appId": "mallx-app", "payOrderNum": pay_order_id})
+check("全额退完支付单流转已退款(state=2)", r.get("orderState") == 2, r)
 
 # ---------- 11. 网关限流 ----------
 print("\n[10] 高并发防护：Redis+Lua 限流")

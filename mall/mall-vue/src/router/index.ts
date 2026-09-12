@@ -43,12 +43,12 @@ const router = createRouter({
       children: [
         { path: '', name: 'adminHome', component: () => import('@/views/admin/Dashboard.vue'), meta: { title: '数据看板' } },
         { path: 'merchants', name: 'adminMch', component: () => import('@/views/admin/MchAudit.vue'), meta: { title: '商户审核' } },
+        { path: 'goods', name: 'adminGoods', component: () => import('@/views/admin/GoodsAudit.vue'), meta: { title: '商品管理' } },
         { path: 'pay', name: 'adminPay', component: () => import('@/views/admin/PayOrders.vue'), meta: { title: '支付订单' } },
         { path: 'refunds', name: 'adminRefund', component: () => import('@/views/admin/RefundAudit.vue'), meta: { title: '退款审核' } },
         { path: 'channels', name: 'adminChannel', component: () => import('@/views/admin/ChannelConfig.vue'), meta: { title: '渠道配置' } },
         { path: 'withdraws', name: 'adminWithdraw', component: () => import('@/views/admin/WithdrawAudit.vue'), meta: { title: '提现审核' } },
         { path: 'categories', name: 'adminCategory', component: () => import('@/views/admin/CategoryMgmt.vue'), meta: { title: '类目管理' } },
-        { path: 'operators', name: 'adminOperator', component: () => import('@/views/admin/OperatorMgmt.vue'), meta: { title: '操作员管理' } },
         { path: 'logs', name: 'adminLogs', component: () => import('@/views/admin/OpLogs.vue'), meta: { title: '操作日志' } },
       ],
     },

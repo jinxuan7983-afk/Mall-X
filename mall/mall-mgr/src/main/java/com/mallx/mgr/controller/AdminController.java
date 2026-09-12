@@ -7,10 +7,12 @@ import com.mallx.mgr.dto.LoginReq;
 import com.mallx.mgr.dto.MchRateReq;
 import com.mallx.mgr.service.AdminService;
 import com.mallx.mgr.service.FundService;
+import com.mallx.mgr.service.GoodsService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -26,6 +28,28 @@ public class AdminController {
 
     private final AdminService adminService;
     private final FundService fundService;
+    private final GoodsService goodsService;
+
+    /** 全平台商品列表（名称/商户/类目/状态筛选） */
+    @PostMapping("/goods/list")
+    public R goodsList(@RequestBody(required = false) Map<String, Object> req) {
+        Map<String, Object> q = req == null ? Map.of() : req;
+        return goodsService.list(
+                intOf(q, "pageNum", 1), intOf(q, "pageSize", 10),
+                strOf(q, "goodsName"), strOf(q, "shopNum"),
+                longOrNull(q, "categoryId"), intOrNull(q, "goodsState"));
+    }
+
+    /** 平台管控：强制商品上下架 */
+    @PostMapping("/goods/state")
+    public R goodsState(@RequestBody Map<String, Object> req) {
+        return goodsService.adminUpdateState(strOf(req, "goodsNum"), intOrNull(req, "goodsState"));
+    }
+
+    private Long longOrNull(Map<String, Object> q, String key) {
+        Object v = q.get(key);
+        return v == null || String.valueOf(v).isBlank() ? null : Long.parseLong(String.valueOf(v));
+    }
 
     /** 管理员登录 */
     @PostMapping("/login")
@@ -88,17 +112,53 @@ public class AdminController {
                 intOf(req, "pageNum", 1), intOf(req, "pageSize", 10));
     }
 
-    /** 后台操作员账号创建（用户管理） */
-    @PostMapping("/user/create")
-    public R createUser(@RequestBody Map<String, Object> req) {
-        return adminService.createUser(strOf(req, "username"), strOf(req, "password"),
-                strOf(req, "realName"), strOf(req, "role"));
+    /** 商户删除（仅 ADMIN；存在商品/订单/资金等业务数据时禁止） */
+    @PostMapping("/mch/delete")
+    public R deleteMch(@RequestBody Map<String, Object> req,
+                       @RequestHeader(value = "X-Admin-Token", required = false) String operatorToken) {
+        return adminService.deleteMch(strOf(req, "shopNum"), operatorToken);
     }
 
-    /** 后台操作员账号列表 */
-    @PostMapping("/user/list")
-    public R listUsers(@RequestBody Map<String, Object> req) {
-        return adminService.listUsers(intOf(req, "pageNum", 1), intOf(req, "pageSize", 10));
+    /** 全平台商品删除（仅 ADMIN；被订单引用时禁止） */
+    @PostMapping("/goods/delete")
+    public R deleteGoods(@RequestBody Map<String, Object> req,
+                         @RequestHeader(value = "X-Admin-Token", required = false) String operatorToken) {
+        return goodsService.adminDelete(strOf(req, "goodsNum"), operatorToken);
+    }
+
+    /** 商品图片上传/替换（仅 ADMIN；base64 图片，更新后商品详情缓存即时失效） */
+    @PostMapping("/goods/pic")
+    public R updateGoodsPic(@RequestBody Map<String, Object> req,
+                            @RequestHeader(value = "X-Admin-Token", required = false) String operatorToken) {
+        return goodsService.updateGoodsPic(strOf(req, "goodsNum"), strOf(req, "imageBase64"), operatorToken);
+    }
+
+    /** 支付订单删除（仅 ADMIN；仅支付失败/关闭/待支付可删） */
+    @PostMapping("/pay/delete")
+    public R deletePay(@RequestBody Map<String, Object> req,
+                       @RequestHeader(value = "X-Admin-Token", required = false) String operatorToken) {
+        return adminService.deletePayOrder(strOf(req, "payOrderId"), operatorToken);
+    }
+
+    /** 支付渠道配置删除（仅 ADMIN；须保留至少一个渠道） */
+    @PostMapping("/channel/delete")
+    public R deleteChannel(@RequestBody Map<String, Object> req,
+                           @RequestHeader(value = "X-Admin-Token", required = false) String operatorToken) {
+        return adminService.deleteChannel(strOf(req, "wayCode"), operatorToken);
+    }
+
+    /** 提现单删除（仅 ADMIN；仅已驳回记录可删） */
+    @PostMapping("/withdraw/delete")
+    public R deleteWithdraw(@RequestBody Map<String, Object> req,
+                            @RequestHeader(value = "X-Admin-Token", required = false) String operatorToken) {
+        return fundService.deleteWithdraw(strOf(req, "withdrawNo"), operatorToken);
+    }
+
+    /** 操作日志删除（仅 ADMIN；删除动作本身亦被审计切面记录） */
+    @PostMapping("/log/delete")
+    public R deleteLog(@RequestBody Map<String, Object> req,
+                       @RequestHeader(value = "X-Admin-Token", required = false) String operatorToken) {
+        return adminService.deleteLog(longOrNull(req, "id"), operatorToken);
     }
 
     /** 操作日志查询（系统运维管理） */

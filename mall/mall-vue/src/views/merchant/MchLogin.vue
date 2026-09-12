@@ -87,12 +87,35 @@
             </el-form>
 
             <!-- 注册 -->
-            <el-form v-else :model="regForm" label-width="84px" @keyup.enter="doRegister">
-              <el-form-item label="店铺名称" required><el-input v-model="regForm.shopName" placeholder="店铺名称" /></el-form-item>
-              <el-form-item label="联系电话" required><el-input v-model="regForm.shopPhone" placeholder="手机号" /></el-form-item>
-              <el-form-item label="经营地址" required><el-input v-model="regForm.shopAddress" placeholder="省市区 + 详细地址" /></el-form-item>
-              <el-form-item label="登录账号" required><el-input v-model="regForm.username" placeholder="唯一账号" /></el-form-item>
-              <el-form-item label="登录密码" required><el-input v-model="regForm.password" type="password" show-password placeholder="密码" /></el-form-item>
+            <el-form v-else ref="regFormRef" :model="regForm" :rules="regRules" label-width="84px" @keyup.enter="doRegister">
+              <el-form-item label="店铺名称" prop="shopName">
+                <el-input v-model="regForm.shopName" placeholder="店铺名称(64字以内)" maxlength="64" />
+              </el-form-item>
+              <el-form-item label="联系电话" prop="shopPhone">
+                <el-input v-model="regForm.shopPhone" placeholder="11位手机号" maxlength="11" />
+              </el-form-item>
+              <el-form-item label="经营地址" prop="shopAddress">
+                <el-input v-model="regForm.shopAddress" placeholder="省市区 + 详细地址" maxlength="255" />
+              </el-form-item>
+              <el-form-item label="登录账号" prop="username">
+                <el-input v-model="regForm.username" placeholder="4~20位字母/数字/下划线" />
+              </el-form-item>
+              <el-form-item label="登录密码" prop="password">
+                <el-input v-model="regForm.password" type="password" show-password placeholder="6~20位" />
+              </el-form-item>
+              <el-form-item label="验证码" prop="captchaCode">
+                <div class="captcha-row">
+                  <el-input v-model="regForm.captchaCode" placeholder="验证码" maxlength="4" />
+                  <img
+                    v-if="captchaImg"
+                    :src="captchaImg"
+                    class="captcha-img"
+                    title="看不清?点击刷新"
+                    alt="验证码"
+                    @click="loadCaptcha"
+                  />
+                </div>
+              </el-form-item>
               <el-button class="submit" type="primary" size="large" :loading="loading" @click="doRegister">提交入驻申请</el-button>
               <p class="hint">提交后由平台管理员审核,审核通过即可登录经营。</p>
             </el-form>
@@ -108,18 +131,18 @@
             </template>
           </el-result>
         </div>
-        <div class="form-foot">© 2026 Mall·X · 行业工程实践课程项目</div>
+        <div class="form-foot">© 2026 Mall·X</div>
       </div>
     </main>
   </div>
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { User, Lock, TrendCharts, Van, Medal, ArrowLeft } from '@element-plus/icons-vue'
-import { mchLogin, mchRegister } from '@/api/modules'
+import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import { User, Lock, Key, TrendCharts, Van, Medal, ArrowLeft } from '@element-plus/icons-vue'
+import { captchaImage, mchLogin, mchRegister } from '@/api/modules'
 import { useSessionStore } from '@/stores/session'
 
 const router = useRouter()
@@ -128,18 +151,68 @@ const session = useSessionStore()
 const mode = ref<'login' | 'register'>('login')
 const loading = ref(false)
 const registered = ref('')
+const regFormRef = ref<FormInstance>()
 const loginForm = reactive({ username: '', password: '' })
-const regForm = reactive({ shopName: '', shopPhone: '', shopAddress: '', username: '', password: '' })
+const regForm = reactive({
+  shopName: '',
+  shopPhone: '',
+  shopAddress: '',
+  username: '',
+  password: '',
+  captchaCode: '',
+})
+const captchaImg = ref('')
+const captchaKey = ref('')
 
 const demoShops = [
   { username: 'shop1', name: '星选数码旗舰店' },
   { username: 'shop2', name: '鲜果之家' },
 ]
 
+const regRules: FormRules = {
+  shopName: [
+    { required: true, message: '请输入店铺名称', trigger: 'blur' },
+    { max: 64, message: '店铺名称不能超过64个字', trigger: 'blur' },
+  ],
+  shopPhone: [
+    { required: true, message: '请输入联系电话', trigger: 'blur' },
+    { pattern: /^1[3-9]\d{9}$/, message: '请输入11位有效手机号', trigger: 'blur' },
+  ],
+  shopAddress: [
+    { required: true, message: '请输入经营地址', trigger: 'blur' },
+    { max: 255, message: '地址不能超过255个字', trigger: 'blur' },
+  ],
+  username: [
+    { required: true, message: '请输入登录账号', trigger: 'blur' },
+    { pattern: /^[a-zA-Z0-9_]{4,20}$/, message: '账号需为4~20位字母、数字或下划线', trigger: 'blur' },
+  ],
+  password: [
+    { required: true, message: '请输入登录密码', trigger: 'blur' },
+    { min: 6, max: 20, message: '密码长度需为6~20位', trigger: 'blur' },
+  ],
+  captchaCode: [{ required: true, message: '请输入验证码', trigger: 'blur' }],
+}
+
 function fillDemo(username: string) {
   loginForm.username = username
   loginForm.password = '123456'
 }
+
+/** 加载图形验证码,失败静默(提交时后端兜底提示) */
+async function loadCaptcha() {
+  try {
+    const r = await captchaImage()
+    captchaKey.value = r.captchaKey
+    captchaImg.value = r.image
+    regForm.captchaCode = ''
+  } catch {
+    /* 保持旧图 */
+  }
+}
+
+watch(mode, (m) => {
+  if (m === 'register') loadCaptcha()
+})
 
 async function doLogin() {
   if (!loginForm.username || !loginForm.password) {
@@ -150,7 +223,7 @@ async function doLogin() {
   try {
     const r = await mchLogin(loginForm.username, loginForm.password)
     // 契约:登录响应仅含 shopNum/shopState,店铺名以编号展示
-    session.setMch({ shopNum: r.shopNum, shopName: r.shopNum, shopState: r.shopState })
+    session.setMch({ shopNum: r.shopNum, shopName: r.shopNum, shopState: r.shopState, token: r.token })
     // 待审核/禁用提示由工作台顶部 alert 持续展示,这里不再重复弹 toast
     router.push('/mch')
   } finally {
@@ -159,17 +232,23 @@ async function doLogin() {
 }
 
 async function doRegister() {
-  for (const [k, v] of Object.entries(regForm)) {
-    if (!v) {
-      ElMessage.warning('请完整填写入驻信息')
-      return
-    }
-  }
+  const valid = await regFormRef.value?.validate().then(() => true).catch(() => false)
+  if (!valid) return
   loading.value = true
   try {
-    const r = await mchRegister({ ...regForm })
+    const r = await mchRegister({
+      shopName: regForm.shopName,
+      shopPhone: regForm.shopPhone,
+      shopAddress: regForm.shopAddress,
+      username: regForm.username,
+      password: regForm.password,
+      captchaKey: captchaKey.value,
+      captchaCode: regForm.captchaCode,
+    })
     registered.value = r.shopNum
     ElMessage.success('注册成功')
+  } catch {
+    loadCaptcha()
   } finally {
     loading.value = false
   }
@@ -178,7 +257,9 @@ async function doRegister() {
 
 <style scoped>
 .auth {
-  min-height: 100vh;
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   display: grid;
   grid-template-columns: minmax(440px, 46%) 1fr;
   background: var(--mx-paper);
@@ -279,10 +360,12 @@ async function doRegister() {
   align-items: flex-start;
   gap: 14px;
   padding: 14px 16px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.055);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(4px);
+  border-radius: 12px;
+  background: var(--mx-glass-fill);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  backdrop-filter: blur(10px) saturate(140%);
+  border: var(--mx-glass-border);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.22);
 }
 
 .pt-ico {
@@ -404,6 +487,25 @@ async function doRegister() {
 
 .el-form :deep(.el-form-item) {
   margin-bottom: 20px;
+}
+
+.captcha-row {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  align-items: center;
+}
+
+.captcha-row :deep(.el-input) {
+  flex: 1;
+}
+
+.captcha-img {
+  height: 38px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid var(--mx-line);
+  flex: none;
 }
 
 .submit {

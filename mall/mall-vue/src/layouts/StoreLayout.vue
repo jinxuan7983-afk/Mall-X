@@ -19,9 +19,8 @@
           </el-input>
         </div>
         <nav class="links">
+          <router-link to="/" class="lk">首页</router-link>
           <router-link to="/my/orders" class="lk">我的订单</router-link>
-          <router-link to="/mch/login" class="lk">商户入驻</router-link>
-          <router-link to="/admin/login" class="lk">管理中心</router-link>
           <router-link to="/cart" class="lk cart">
             <el-badge :value="cart.count" :hidden="cart.count === 0" type="danger">
               <el-icon :size="18"><ShoppingCart /></el-icon>
@@ -53,12 +52,6 @@
         </transition>
       </router-view>
     </main>
-    <footer class="foot">
-      <div class="inner">
-        <span>Mall·X 多商家电商平台 · 行业工程实践课程项目</span>
-        <span>Spring Cloud 微服务 · Vue3 + TypeScript + Element Plus</span>
-      </div>
-    </footer>
   </div>
 </template>
 
@@ -85,18 +78,28 @@ function logout() {
 
 <style scoped>
 .store {
-  min-height: 100vh;
+  height: 100%;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
 
 .topbar {
-  position: sticky;
-  top: 0;
+  flex: none;
+  position: relative;
   z-index: 20;
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(8px);
-  border-bottom: 1px solid var(--mx-line);
+  background: rgba(255, 255, 255, 0.72);
+  -webkit-backdrop-filter: blur(var(--mx-glass-blur)) saturate(160%);
+  backdrop-filter: blur(var(--mx-glass-blur)) saturate(160%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 1px 24px rgba(35, 31, 28, 0.05);
+}
+
+/* 不支持 backdrop-filter:回退为高填充白,保导航可读 */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .topbar {
+    background: rgba(255, 255, 255, 0.96);
+  }
 }
 
 .inner {
@@ -107,6 +110,7 @@ function logout() {
   align-items: center;
   gap: 24px;
   height: 60px;
+  min-width: 0;
 }
 
 .brand {
@@ -187,26 +191,14 @@ function logout() {
 
 .body {
   flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   width: 100%;
   max-width: 1200px;
   margin: 0 auto;
   padding: 20px 20px 48px;
   box-sizing: border-box;
-}
-
-.foot {
-  border-top: 1px solid var(--mx-line);
-  background: #fff;
-}
-
-.foot .inner {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 16px 20px;
-  display: flex;
-  justify-content: space-between;
-  color: var(--mx-ink-3);
-  font-size: 12px;
 }
 
 @media (max-width: 760px) {
@@ -216,6 +208,44 @@ function logout() {
 
   .links {
     gap: 12px;
+  }
+}
+
+/* 小屏:压缩品牌区与导航,导航可横向滑动(不撑破布局,功能不丢失) */
+@media (max-width: 600px) {
+  .inner {
+    gap: 10px;
+    padding: 0 12px;
+  }
+
+  .name {
+    font-size: 15px;
+  }
+
+  .name i {
+    display: none;
+  }
+
+  .links {
+    gap: 2px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .links::-webkit-scrollbar {
+    display: none;
+  }
+
+  .lk {
+    padding: 6px 8px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  .body {
+    padding: 14px 12px 40px;
   }
 }
 </style>

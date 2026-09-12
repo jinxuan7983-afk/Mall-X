@@ -36,6 +36,12 @@ rocketmq:
     send-message-timeout: 3000
 
 mallx:
+  # 商品图片上传目录（相对服务运行目录），经 /uploads/** 静态映射对外提供
+  upload:
+    dir: ${UPLOAD_DIR:./uploads}
+  captcha:
+    # 图形验证码回显明文（供自动化测试/联调），生产环境必须置为 false
+    echo-code: ${CAPTCHA_ECHO_CODE:true}
   sign:
     enabled: true
     secret: ${SIGN_SECRET:mallx-pay-secret-2026}

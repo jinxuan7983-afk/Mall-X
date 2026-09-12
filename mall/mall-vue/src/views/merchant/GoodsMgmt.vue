@@ -13,7 +13,7 @@
       <el-table-column label="商品" min-width="220">
         <template #default="{ row }">
           <div class="gcell">
-            <div class="pic"><GoodsPic :name="row.goodsName" :seed="row.goodsNum" /></div>
+            <div class="pic"><GoodsPic :name="row.goodsName" :seed="row.goodsNum" :pic="row.picUrl || undefined" /></div>
             <div>
               <div class="nm">{{ row.goodsName }}</div>
               <div class="muted num">{{ row.goodsNum }}</div>
@@ -29,12 +29,13 @@
       <el-table-column label="状态" width="90" align="center">
         <template #default="{ row }"><StateTag kind="goods" :value="row.goodsState" /></template>
       </el-table-column>
-      <el-table-column label="操作" width="210" align="center">
+      <el-table-column label="操作" width="260" align="center">
         <template #default="{ row }">
           <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
           <el-button link :type="row.goodsState === 1 ? 'warning' : 'success'" @click="toggleState(row)">
             {{ row.goodsState === 1 ? '下架' : '上架' }}
           </el-button>
+          <el-button link type="danger" @click="remove(row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -67,9 +68,9 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh } from '@element-plus/icons-vue'
-import { categoryList, goodsCreate, goodsList, goodsUpdate } from '@/api/modules'
+import { categoryList, goodsCreate, goodsList, goodsUpdate, mchGoodsDelete } from '@/api/modules'
 import { money } from '@/api/client'
 import { useSessionStore } from '@/stores/session'
 import type { Category, Goods } from '@/types'
@@ -183,6 +184,32 @@ async function toggleState(row: Goods) {
   } as never)
   ElMessage.success(row.goodsState === 1 ? '已下架' : '已上架')
   load()
+}
+
+/** 删除自有商品:被订单引用的商品禁止删除(后端校验兜底) */
+async function remove(row: Goods) {
+  const token = session.mch?.token
+  if (!token) {
+    ElMessage.warning('登录凭证已失效,请退出后重新登录')
+    return
+  }
+  try {
+    await ElMessageBox.confirm(
+      `确认删除商品「${row.goodsName}」(${row.goodsNum})?删除后不可恢复,被订单引用的商品不可删除。`,
+      '删除确认',
+      { type: 'warning', confirmButtonClass: 'el-button--danger' },
+    )
+  } catch {
+    return
+  }
+  try {
+    await mchGoodsDelete(row.goodsNum, token)
+    ElMessage.success(`商品「${row.goodsName}」已删除`)
+    if (records.value.length === 1 && page.value > 1) page.value -= 1
+    load()
+  } catch {
+    // 失败原因已由 client.ts 统一提示(如:该商品已被订单引用)
+  }
 }
 
 onMounted(() => {

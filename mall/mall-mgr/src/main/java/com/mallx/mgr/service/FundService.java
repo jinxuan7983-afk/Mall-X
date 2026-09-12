@@ -11,6 +11,7 @@ import com.mallx.mgr.dto.WithdrawReq;
 import com.mallx.mgr.entity.Withdraw;
 import com.mallx.mgr.mapper.PayOrderViewMapper;
 import com.mallx.mgr.mapper.WithdrawMapper;
+import com.mallx.mgr.support.AdminGuard;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -28,6 +29,7 @@ public class FundService {
 
     private final PayOrderViewMapper payOrderViewMapper;
     private final WithdrawMapper withdrawMapper;
+    private final AdminGuard adminGuard;
 
     /** 资金总览：累计营收 - 手续费 = 净收益；再扣除已退款与已提现 = 可提现余额 */
     public R overview(String shopNum) {
@@ -110,6 +112,27 @@ public class FundService {
         w.setFinishTime(LocalDateTime.now());
         withdrawMapper.updateById(w);
         return R.ok("提现审核完成");
+    }
+
+    /**
+     * 平台删除提现单（仅 ADMIN 可执行）。
+     * 删除策略：仅已驳回记录可删；审核中/已到账涉及资金流向，须留痕禁止删除。
+     */
+    public R deleteWithdraw(String withdrawNo, String operatorToken) {
+        adminGuard.requireAdmin(operatorToken);
+        if (withdrawNo == null || withdrawNo.isBlank()) {
+            throw new BizException("请指定要删除的提现单");
+        }
+        Withdraw w = withdrawMapper.selectOne(Wrappers.<Withdraw>lambdaQuery()
+                .eq(Withdraw::getWithdrawNo, withdrawNo));
+        if (w == null) {
+            throw new BizException("提现单不存在或已被删除");
+        }
+        if (w.getState() != MallConstant.WITHDRAW_FAIL) {
+            throw new BizException("仅已驳回的提现单可删除，审核中/已到账记录涉及资金流向须保留");
+        }
+        withdrawMapper.deleteById(w.getId());
+        return R.ok("提现单「" + withdrawNo + "」已删除");
     }
 
     private BigDecimal toBd(Object v) {

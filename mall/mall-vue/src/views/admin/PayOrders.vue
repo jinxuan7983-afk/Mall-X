@@ -48,6 +48,11 @@
       <el-table-column label="创建时间" width="170">
         <template #default="{ row }"><span class="small num">{{ fmtTime(row.createdAt) }}</span></template>
       </el-table-column>
+      <el-table-column v-if="canDelete" label="操作" width="90" align="center" fixed="right">
+        <template #default="{ row }">
+          <el-button link type="danger" @click="remove(row)">删除</el-button>
+        </template>
+      </el-table-column>
     </el-table>
 
     <div class="pager">
@@ -59,8 +64,9 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { Search } from '@element-plus/icons-vue'
-import { adminPayList } from '@/api/modules'
+import { adminPayDelete, adminPayList } from '@/api/modules'
 import { fmtTime, money, wayCodeText } from '@/api/client'
+import { useAdminDelete } from '@/composables/useAdminDelete'
 import type { PayOrder } from '@/types'
 import StateTag from '@/components/StateTag.vue'
 
@@ -78,6 +84,22 @@ const filters = reactive<{ shopNum: string; orderState: number | undefined; wayC
 })
 
 const wayText = (w: string) => wayCodeText[w] || w
+
+const { canDelete, adminDelete } = useAdminDelete()
+
+/** 删除支付订单:仅失败/关闭/待支付可删,成功与已退款涉及资金流向不可删(后端校验兜底) */
+async function remove(row: PayOrder) {
+  const ok = await adminDelete(
+    `支付订单「${row.payOrderId}」`,
+    '仅支付失败/订单关闭/待支付的订单可删除,支付成功与已退款订单涉及资金流向不可删除。',
+    (t) => adminPayDelete(row.payOrderId, t),
+    `支付订单「${row.payOrderId}」已删除`,
+  )
+  if (ok) {
+    if (records.value.length === 1 && page.value > 1) page.value -= 1
+    load()
+  }
+}
 
 async function load() {
   loading.value = true

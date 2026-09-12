@@ -1,6 +1,8 @@
 package com.mallx.mgr.service;
 
 import cn.hutool.crypto.digest.DigestUtil;
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mallx.common.constant.MallConstant;
@@ -12,17 +14,26 @@ import com.mallx.mgr.dto.ChannelConfigReq;
 import com.mallx.mgr.dto.LoginReq;
 import com.mallx.mgr.dto.MchRateReq;
 import com.mallx.mgr.entity.AdminUser;
+import com.mallx.mgr.entity.BizOrder;
 import com.mallx.mgr.entity.ChannelConfig;
+import com.mallx.mgr.entity.Goods;
 import com.mallx.mgr.entity.Mch;
 import com.mallx.mgr.entity.MchRate;
 import com.mallx.mgr.entity.OperateLog;
 import com.mallx.mgr.entity.PayOrderView;
+import com.mallx.mgr.entity.RefundOrder;
+import com.mallx.mgr.entity.Withdraw;
 import com.mallx.mgr.mapper.AdminUserMapper;
 import com.mallx.mgr.mapper.ChannelConfigMapper;
+import com.mallx.mgr.mapper.GoodsMapper;
 import com.mallx.mgr.mapper.MchMapper;
 import com.mallx.mgr.mapper.MchRateMapper;
 import com.mallx.mgr.mapper.OperateLogMapper;
+import com.mallx.mgr.mapper.OrderMapper;
 import com.mallx.mgr.mapper.PayOrderViewMapper;
+import com.mallx.mgr.mapper.RefundOrderMapper;
+import com.mallx.mgr.mapper.WithdrawMapper;
+import com.mallx.mgr.support.AdminGuard;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -30,7 +41,6 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -46,6 +56,11 @@ public class AdminService {
     private final ChannelConfigMapper channelConfigMapper;
     private final PayOrderViewMapper payOrderViewMapper;
     private final OperateLogMapper operateLogMapper;
+    private final GoodsMapper goodsMapper;
+    private final OrderMapper orderMapper;
+    private final RefundOrderMapper refundOrderMapper;
+    private final WithdrawMapper withdrawMapper;
+    private final AdminGuard adminGuard;
 
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -68,27 +83,99 @@ public class AdminService {
                 .set("role", admin.getRole());
     }
 
-    public R createUser(String username, String password, String realName, String role) {
-        Long exists = adminUserMapper.selectCount(Wrappers.<AdminUser>lambdaQuery()
-                .eq(AdminUser::getUsername, username));
-        if (exists != null && exists > 0) {
-            throw new BizException("账号已存在");
+    /**
+     * 商户删除（仅 ADMIN 可执行）。
+     * 删除策略：存在商品/业务订单/支付订单/退款/提现等业务数据时禁止删除（保证交易与资金可追溯）；
+     * 通过校验后物理删除商户，并级联清理其差异化费率配置（配置类数据随主体删除）。
+     */
+    public R deleteMch(String shopNum, String operatorToken) {
+        adminGuard.requireAdmin(operatorToken);
+        if (!StringUtils.hasText(shopNum)) {
+            throw new BizException("请指定要删除的商户");
         }
-        AdminUser admin = new AdminUser();
-        admin.setUsername(username);
-        admin.setPassword(DigestUtil.md5Hex(password + MallConstant.PASSWORD_SALT));
-        admin.setRealName(realName);
-        admin.setRole(role == null || role.isBlank() ? "OPS" : role);
-        admin.setState(1);
-        adminUserMapper.insert(admin);
-        return R.ok("后台账号创建成功");
+        Mch mch = mchMapper.selectOne(Wrappers.<Mch>lambdaQuery().eq(Mch::getShopNum, shopNum));
+        if (mch == null) {
+            throw new BizException("商户不存在或已被删除");
+        }
+        if (exists(goodsMapper, Wrappers.<Goods>lambdaQuery().eq(Goods::getShopNum, shopNum))) {
+            throw new BizException("该商户下仍有商品，请先处理商品后再删除");
+        }
+        if (exists(orderMapper, Wrappers.<BizOrder>lambdaQuery().eq(BizOrder::getShopNum, shopNum))) {
+            throw new BizException("该商户存在业务订单，为保证交易可追溯不可删除");
+        }
+        if (exists(payOrderViewMapper, Wrappers.<PayOrderView>lambdaQuery().eq(PayOrderView::getShopNum, shopNum))) {
+            throw new BizException("该商户存在支付订单，为保证资金可追溯不可删除");
+        }
+        if (exists(refundOrderMapper, Wrappers.<RefundOrder>lambdaQuery().eq(RefundOrder::getShopNum, shopNum))) {
+            throw new BizException("该商户存在退款记录，为保证资金可追溯不可删除");
+        }
+        if (exists(withdrawMapper, Wrappers.<Withdraw>lambdaQuery().eq(Withdraw::getShopNum, shopNum))) {
+            throw new BizException("该商户存在提现记录，为保证资金可追溯不可删除");
+        }
+        mchRateMapper.delete(Wrappers.<MchRate>lambdaQuery().eq(MchRate::getShopNum, shopNum));
+        mchMapper.deleteById(mch.getId());
+        return R.ok("商户「" + mch.getShopName() + "」已删除");
     }
 
-    public R listUsers(int pageNum, int pageSize) {
-        Page<AdminUser> page = adminUserMapper.selectPage(new Page<>(pageNum, pageSize),
-                Wrappers.<AdminUser>lambdaQuery().orderByDesc(AdminUser::getId));
-        page.getRecords().forEach(u -> u.setPassword(null));
-        return pageResult(page);
+    /**
+     * 支付订单删除（仅 ADMIN 可执行）。
+     * 删除策略：仅支付失败/订单关闭/待支付状态可删；支付成功与已退款涉及资金流向，须留痕禁止删除。
+     */
+    public R deletePayOrder(String payOrderId, String operatorToken) {
+        adminGuard.requireAdmin(operatorToken);
+        if (!StringUtils.hasText(payOrderId)) {
+            throw new BizException("请指定要删除的支付订单");
+        }
+        PayOrderView payOrder = payOrderViewMapper.selectOne(Wrappers.<PayOrderView>lambdaQuery()
+                .eq(PayOrderView::getPayOrderId, payOrderId));
+        if (payOrder == null) {
+            throw new BizException("支付订单不存在或已被删除");
+        }
+        int state = payOrder.getOrderState() == null ? -1 : payOrder.getOrderState();
+        if (state == MallConstant.PAY_STATE_SUCCESS || state == MallConstant.PAY_STATE_REFUNDED) {
+            throw new BizException("支付成功/已退款的订单涉及资金流向，不可删除");
+        }
+        payOrderViewMapper.deleteById(payOrder.getId());
+        return R.ok("支付订单「" + payOrderId + "」已删除");
+    }
+
+    /** 渠道配置删除（仅 ADMIN 可执行）；保护规则：系统须保留至少一个支付渠道 */
+    public R deleteChannel(String wayCode, String operatorToken) {
+        adminGuard.requireAdmin(operatorToken);
+        if (!StringUtils.hasText(wayCode)) {
+            throw new BizException("请指定要删除的支付渠道");
+        }
+        ChannelConfig config = channelConfigMapper.selectOne(Wrappers.<ChannelConfig>lambdaQuery()
+                .eq(ChannelConfig::getWayCode, wayCode));
+        if (config == null) {
+            throw new BizException("渠道配置不存在或已被删除");
+        }
+        Long total = channelConfigMapper.selectCount(null);
+        if (total != null && total <= 1) {
+            throw new BizException("系统须保留至少一个支付渠道，无法删除");
+        }
+        channelConfigMapper.deleteById(config.getId());
+        return R.ok("支付渠道「" + config.getChannelName() + "」配置已删除");
+    }
+
+    /** 操作日志删除（仅 ADMIN 可执行）；用于清理误记录场景，删除动作本身亦会被审计切面留痕 */
+    public R deleteLog(Long id, String operatorToken) {
+        adminGuard.requireAdmin(operatorToken);
+        if (id == null) {
+            throw new BizException("请指定要删除的日志");
+        }
+        OperateLog logEntity = operateLogMapper.selectById(id);
+        if (logEntity == null) {
+            throw new BizException("日志不存在或已被删除");
+        }
+        operateLogMapper.deleteById(id);
+        return R.ok("操作日志已删除");
+    }
+
+    /** 关联数据存在性校验（null 安全） */
+    private <T> boolean exists(BaseMapper<T> mapper, Wrapper<T> wrapper) {
+        Long count = mapper.selectCount(wrapper);
+        return count != null && count > 0;
     }
 
     /** 商户审核：1-审核通过 2-审核驳回（驳回需填写原因） */

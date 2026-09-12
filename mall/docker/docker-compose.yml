@@ -18,6 +18,8 @@ services:
       - ../sql/mallDb.sql:/docker-entrypoint-initdb.d/01-mallDb.sql:ro
       - ../sql/mallTable.sql:/docker-entrypoint-initdb.d/02-mallTable.sql:ro
       - ../sql/mallInsert.sql:/docker-entrypoint-initdb.d/03-mallInsert.sql:ro
+      # 可选演示交易数据（近 7 天，时间动态生成）：仅首次初始化数据卷时自动执行
+      - ../sql/demoData.sql:/docker-entrypoint-initdb.d/04-demoData.sql:ro
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_general_ci
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-uroot", "-proot123"]

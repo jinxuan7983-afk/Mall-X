@@ -70,9 +70,12 @@ docker compose up -d mysql redis nacos rocketmq-namesrv rocketmq-broker
 ```
 
 MySQL 首次启动自动按序执行 `sql/mallDb.sql`（建库）→ `sql/mallTable.sql`（建表）→ `sql/mallInsert.sql`
-（初始化数据，含演示账号与商品；脚本头部已含 `SET NAMES utf8mb4`，中文数据编码正确）。若 MySQL 已手工执行过
-SQL，请删除 `mysql-data` 卷后重新启动。三个 SQL 脚本头部新增的 `SET NAMES utf8mb4` 用于修复导入时
-client 字符集为 latin1 导致的中文双重编码乱码问题。
+（初始化数据，含演示账号与商品）→ `sql/demoData.sql`（可选演示交易数据：近 7 天订单/支付/退款/提现，
+时间动态生成，使看板与统计图表有正常展示）。脚本头部已含 `SET NAMES utf8mb4`，中文数据编码正确。
+若 MySQL 已手工执行过 SQL，请删除 `mysql-data` 卷后重新启动。
+> 已有数据卷时如需补演示数据，手动执行：
+> `docker exec -i mallx-mysql mysql -uroot -proot123 --default-character-set=utf8mb4 mall_db < sql/demoData.sql`
+> （脚本可重复执行：先按编号段清理上次演示数据再写入，刷新为最新"近 7 天"）
 
 > **端口冲突**：本机 3306 被原生 MySQL 占用时，为容器指定其他宿主机端口并让后端跟随：
 >
@@ -126,17 +129,22 @@ python scripts/api_test.py            # 全链路自动化测试（默认走网�
 python scripts/api_test.py http://127.0.0.1:10010
 ```
 
-脚本覆盖：注册→审核→登录→商品→下单（Lua 扣库存）→支付下单→回调幂等→发货→收货→退款→统计→资金→限流→防篡改。
+脚本覆盖：注册→审核→登录→商品→下单（Lua 扣库存）→支付下单→回调幂等→发货→收货→商户退款→
+用户端售后（申请退款/凭证上传/商户审核同意与拒绝/两端进度同步/全额退完流转）→统计→资金→限流→防篡改。
 
 ### 演示账号
 
 | 角色 | 账号 | 密码 | 说明 | 登录入口 |
 | --- | --- | --- | --- | --- |
-| 平台管理员 | admin | 123456 | 审核商户、配置费率/渠道、退款/提现审核 | 商城右上角「管理中心」 |
+| 平台管理员 | admin | 123456 | 审核商户、配置费率/渠道、退款/提现审核 | 直接访问 `/admin/login` |
 | 商户 | shop1 / shop2 | 123456 | 已审核通过，含演示商品（星选数码旗舰店 / 鲜果之家） | 商城右上角「商户入驻」 |
-| 用户 | user1 | 123456 | 下单购物 | 商城右上角「登录 / 注册」 |
+| 用户 | user1 / user2 | 123456 | 下单购物（小明 / 小美） | 商城右上角「登录 / 注册」 |
 
 > 前端内置 mock 模式使用同一套演示账号，种子数据与 `sql/mallInsert.sql` 一致。
+> `sql/demoData.sql`（04 初始化脚本）额外提供近 7 天完整交易链路：11 笔订单覆盖
+> 待支付/待发货/已发货/已完成/已关闭，含 1 笔退款已完成 + 1 笔退款待审核（均关联用户 user2，
+> 可登录 user2 在「我的订单」查看退款进度、登录 shop2 在「退款售后」处理退款申请）、
+> 1 笔提现已到账 + 1 笔提现审核中，手续费按渠道费率计算、商户资金余额自洽。
 
 ---
 
@@ -144,9 +152,14 @@ python scripts/api_test.py http://127.0.0.1:10010
 
 | 端 | 路由 | 核心页面 |
 | --- | --- | --- |
-| 用户商城 | `/` | 商品列表（类目/搜索/分页）、商品详情、购物车（localStorage 离线购物车，登录后合并）、订单确认（多商户自动拆单）、收银台（三渠道 + 轮询支付结果）、我的订单（确认收货） |
-| 商户后台 | `/mch` | 入驻注册、工作台（营收/手续费/净收益 + ECharts）、商品管理、订单发货、交易流水（对账/发起部分退款）、退款进度、资金/提现、店铺统计 |
-| 平台后台 | `/admin` | 数据看板（交易额/七日走势/渠道占比）、商户审核与差异化费率、全平台支付订单、退款审核、渠道配置（支付宝沙箱参数）、提现审核、类目、操作员（ADMIN/OPS）、操作日志 |
+| 用户商城 | `/` | 商品列表（类目/搜索/分页）、商品详情、购物车（localStorage 离线购物车，登录后合并）、订单确认（多商户自动拆单）、收银台（三渠道 + 轮询支付结果）、我的订单（确认收货、**申请退款**：填写原因/部分金额、上传凭证、查看退款进度时间线并自动轮询刷新） |
+| 商户后台 | `/mch` | 入驻注册、工作台（营收/手续费/净收益 + ECharts）、商品管理（发布/编辑/上下架/删除，被订单引用时禁止删除）、订单发货、交易流水（对账/代客发起退款）、**退款售后**（统计概览、待处理列表、同意退款/拒绝并填写处理备注、凭证查看、进度详情）、资金/提现、店铺统计 |
+| 平台后台 | `/admin` | 数据看板（交易额/七日走势/渠道占比）、商户审核与差异化费率、全平台支付订单、退款审核（四态流转/凭证查看/兜底管控）、渠道配置（支付宝沙箱参数）、提现审核、类目、操作日志；各模块支持删除（仅 ADMIN，前端二次确认，后端按业务保护规则拦截并留痕）；商品图片支持上传/替换（前端压缩、上传后实时生效） |
+
+> **布局与响应式**：全站采用「视口锁定」布局——顶栏/侧栏/内容区几何固定，仅内容区作为唯一滚动容器
+> （`html/body` 已禁止文档级滚动与下拉回弹，内容不足一屏时不出现滚动条）。已适配桌面（1920/1440）、
+> 平板（1024/768）与手机（390/360）：窄屏下管理端/商户端侧栏自动转为顶部横向菜单并可横滑，
+> 商城顶部导航小屏横滑，工具栏自动换行、表格在卡片内横向滚动，各宽高比下均无溢出或布局错乱。
 
 ---
 
@@ -166,12 +179,17 @@ python scripts/api_test.py http://127.0.0.1:10010
 | `POST /pay/query` | 按 payOrderNum+shopNum 查询订单详情与状态 |
 | `POST /pay/list/mch` | 商户订单分页，支持 orderState/wayCode 筛选 |
 
-### 退款管理（4.4）
+### 退款/售后（4.4 + 售后功能）
 | 接口 | 说明 |
 | --- | --- |
 | `POST /refund/create` | 商户对已支付订单发起退款（支持部分退款，校验可退余额） |
 | `POST /refund/query` | 退款审核状态与渠道退款进度查询 |
-| `POST /admin/refund/audit` | 平台退款审核（通过→Feign 调支付微服务执行渠道退款） |
+| `POST /refund/apply` | 用户端按订单申请退款（填写原因/金额、上传凭证；仅本人已支付订单，同单处理中禁止重复提交） |
+| `POST /refund/user/list` `/refund/detail` | 用户端退款记录与进度详情（详情按 userNum/shopNum 校验归属） |
+| `POST /refund/evidence/upload` | 退款凭证上传（base64 压缩图 ≤2MB，存 `/uploads/refund/`，最多 3 张随申请提交） |
+| `POST /refund/mch/list` `/refund/mch/stats` | 商户端退款列表（状态筛选）与统计概览（各状态笔数/待处理与累计退款金额） |
+| `POST /refund/mch/audit` | 商户端审核：同意→立即执行渠道退款；拒绝→驳回并填写处理备注（`X-Mch-Token` 校验身份与退款单归属） |
+| `POST /admin/refund/audit` | 平台退款审核（兜底管控，与商户端共用同一状态机） |
 | `POST /admin/refund/list` | 平台退款列表分页 |
 
 ### 平台管理端（4.5 + 3.2 功能设计）
@@ -185,8 +203,11 @@ python scripts/api_test.py http://127.0.0.1:10010
 | `POST /admin/channel/list` | 渠道配置查询 |
 | `POST /admin/pay/list` | 全平台支付订单管控（多条件筛选） |
 | `POST /admin/withdraw/audit` | 提现审核 |
-| `POST /admin/user/create` `/admin/user/list` | 后台操作员账号管理 |
-| `POST /admin/log/list` | 后台操作日志查询（AOP 自动记录） |
+| `POST /admin/log/list` `/admin/log/delete` | 后台操作日志查询/单条删除（AOP 自动记录，敏感操作操作人取自登录令牌；删除动作自身亦留痕） |
+| `POST /admin/mch/delete` `/admin/goods/delete` | 商户/商品删除：仅 ADMIN；存在商品、订单、资金等业务数据或商品被订单引用时禁止删除 |
+| `POST /admin/goods/pic` | 商品图片上传/替换（仅 ADMIN，前端压缩后 base64 提交；更新后详情缓存即时失效，文件存于 `mall/uploads/` 并经 `/uploads/**` 访问） |
+| `POST /admin/pay/delete` `/admin/refund/delete` `/admin/withdraw/delete` | 支付单/退款单/提现单删除：仅 ADMIN；仅失败/关闭/待支付（退款仅已拒绝、提现仅驳回）可删，涉资金流向记录留痕 |
+| `POST /admin/channel/delete` `/admin/category/delete` | 渠道/类目删除：仅 ADMIN；须保留至少一个支付渠道，类目存在子类目或商品引用时禁止删除 |
 
 ### 数据统计（4.6）
 | 接口 | 说明 |
@@ -199,7 +220,7 @@ python scripts/api_test.py http://127.0.0.1:10010
 | --- | --- |
 | `POST /user/register` `/user/login` | 用户注册登录 |
 | `GET /category/list`、`POST /admin/category/save` | 类目查询与维护 |
-| `POST /goods/create` `/goods/update` `/goods/list` `/goods/detail` | 商品管理（详情走 Redis 缓存） |
+| `POST /goods/create` `/goods/update` `/goods/list` `/goods/detail` `/goods/delete` | 商品管理（详情走 Redis 缓存；商户删除仅限自有商品，被订单引用时禁止删除） |
 | `POST /order/create` | 下单：Redis Lua 原子预扣库存 + DB 条件扣减防超卖 + RocketMQ 延迟关单 |
 | `POST /order/list` `/order/detail` | 订单查询（用户/商户双视角） |
 | `POST /order/deliver` `/order/confirm` | 商户发货（同步物流单号）、用户确认收货 |
@@ -218,8 +239,8 @@ python scripts/api_test.py http://127.0.0.1:10010
 示例：
 
 ```text
-参数：shopNum=SH1000000001, payMoney=199.00
-拼接：payMoney=199.00&shopNum=SH1000000001&key=mallx-pay-secret-2026
+参数：shopNum=SH417826, payMoney=199.00
+拼接：payMoney=199.00&shopNum=SH417826&key=mallx-pay-secret-2026
 sign：md5(上述字符串)
 ```
 
@@ -234,7 +255,9 @@ sign：md5(上述字符串)
 * **支付订单 orderState（文档 4.7）**：`0`-支付成功、`1`-支付失败、`2`-已退款、`3`-订单关闭；
   另设 `4`-待支付为下单初始态（文档 4.2.1 示例中的 `orderState:3` 与 4.7 节定义冲突，实现以 4.7 节为准，
   增加 4-待支付以保证"延迟关单"可观测）。
-* **退款单 refundState**：`0`-审核中、`1`-退款成功、`2`-退款失败。
+* **退款单 refundState（售后四态）**：`0`-待审核、`1`-处理中（审核通过、渠道退款执行中）、`2`-已完成、
+  `3`-已拒绝（审核拒绝或渠道退款失败，备注说明原因）；流转：待审核→(同意)处理中→已完成 / 待审核→(拒绝)已拒绝；
+  全额退完时原支付单流转为「已退款」，部分退款保持支付成功（额度由退款单累计占用，已拒绝释放）。
 * **商户 shopState**：`0`-待审核、`1`-正常、`2`-禁用。
 * **业务订单**：`0`-待支付、`1`-已支付待发货、`2`-已发货、`3`-已完成、`4`-已关闭。
 * **提现 state**：`0`-审核中、`1`-成功、`2`-失败。

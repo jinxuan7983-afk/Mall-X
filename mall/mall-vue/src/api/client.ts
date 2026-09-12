@@ -45,11 +45,11 @@ export async function get<T extends R = R>(path: string): Promise<T> {
 export async function post<T extends R = R>(
   path: string,
   params: Record<string, unknown> = {},
-  opt: { silent?: boolean } = {},
+  opt: { silent?: boolean; headers?: Record<string, string> } = {},
 ): Promise<T> {
   const sign = signOf(params)
   try {
-    const { data } = await http.post<T>(path, { ...params, sign })
+    const { data } = await http.post<T>(path, { ...params, sign }, { headers: opt.headers })
     if (data?.id !== '0') {
       const err = new Error(data?.message || '请求失败') as Error & { id?: string }
       err.id = data?.id

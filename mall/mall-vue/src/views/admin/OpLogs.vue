@@ -19,6 +19,11 @@
       <el-table-column label="时间" width="180">
         <template #default="{ row }"><span class="small num">{{ fmtTime(row.createdAt) }}</span></template>
       </el-table-column>
+      <el-table-column v-if="canDelete" label="操作" width="90" align="center" fixed="right">
+        <template #default="{ row }">
+          <el-button link type="danger" @click="remove(row)">删除</el-button>
+        </template>
+      </el-table-column>
     </el-table>
 
     <div class="pager">
@@ -30,8 +35,9 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { Refresh } from '@element-plus/icons-vue'
-import { adminLogList } from '@/api/modules'
+import { adminLogDelete, adminLogList } from '@/api/modules'
 import { fmtTime } from '@/api/client'
+import { useAdminDelete } from '@/composables/useAdminDelete'
 import type { OperateLog } from '@/types'
 
 const records = ref<OperateLog[]>([])
@@ -48,6 +54,22 @@ async function load() {
     total.value = r.total
   } finally {
     loading.value = false
+  }
+}
+
+const { canDelete, adminDelete } = useAdminDelete()
+
+/** 删除操作日志:用于清理误记录,删除动作本身也会写入新的审计日志 */
+async function remove(row: OperateLog) {
+  const ok = await adminDelete(
+    `操作日志「${row.module}」`,
+    '删除后不可恢复;本次删除动作本身会写入新的审计日志。',
+    (t) => adminLogDelete(row.id, t),
+    '操作日志已删除',
+  )
+  if (ok) {
+    if (records.value.length === 1 && page.value > 1) page.value -= 1
+    load()
   }
 }
 

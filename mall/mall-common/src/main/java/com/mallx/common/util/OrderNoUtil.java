@@ -24,7 +24,17 @@ public class OrderNoUtil {
     public static String orderNum()    { return gen("SO"); }
     public static String channelOrderNo() { return gen("CH"); }
     public static String withdrawNo()  { return gen("WD"); }
-    public static String shopNum()     { return gen("SH"); }
+
+    /** 商户编号：SH + 6 位随机数字（简短格式；唯一性由 uk_mch_shop_num 唯一索引与注册重试共同保证） */
+    public static String shopNum()     { return "SH" + randomDigits(); }
+
     public static String userNum()     { return gen("U"); }
-    public static String goodsNum()    { return gen("G"); }
+
+    /** 商品编号：G + 6 位随机数字（简短格式；唯一性由 uk_goods_goods_num 唯一索引与发布重试共同保证） */
+    public static String goodsNum()    { return "G" + randomDigits(); }
+
+    /** 6 位随机数字（100000-999999，首位非 0 保证定长） */
+    private static String randomDigits() {
+        return String.format("%06d", ThreadLocalRandom.current().nextInt(100000, 1000000));
+    }
 }

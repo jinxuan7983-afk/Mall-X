@@ -1,6 +1,7 @@
 package com.mallx.mgr.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -23,6 +24,10 @@ public class Goods {
     private String goodsName;
 
     private String shopNum;
+
+    /** 店铺名称（非数据库字段，查询时由商户表关联填充，前端展示用） */
+    @TableField(exist = false)
+    private String shopName;
 
     private Long categoryId;
 

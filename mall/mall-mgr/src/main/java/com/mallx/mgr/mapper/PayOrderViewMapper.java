@@ -73,13 +73,13 @@ public interface PayOrderViewMapper extends BaseMapper<PayOrderView> {
             + "FROM t_pay_order WHERE shop_num = #{shopNum} AND order_state IN (0, 1, 2)")
     Map<String, Object> selectMchTradeCount(@Param("shopNum") String shopNum);
 
-    /** 商户已退款总额（可退款余额校验用） */
+    /** 支付单已占用的退款金额：待审核/处理中/已完成均占用可退额度，仅已拒绝释放（可退款余额校验用） */
     @Select("SELECT IFNULL(SUM(refund_money), 0) FROM t_refund_order "
-            + "WHERE pay_order_id = #{payOrderId} AND refund_state = 1")
+            + "WHERE pay_order_id = #{payOrderId} AND refund_state != 3")
     BigDecimal selectRefundedSum(@Param("payOrderId") String payOrderId);
 
-    /** 商户累计退款成功总额（资金总览用） */
+    /** 商户累计退款成功总额（资金总览用，仅已完成） */
     @Select("SELECT IFNULL(SUM(refund_money), 0) FROM t_refund_order "
-            + "WHERE shop_num = #{shopNum} AND refund_state = 1")
+            + "WHERE shop_num = #{shopNum} AND refund_state = 2")
     BigDecimal selectShopRefundedSum(@Param("shopNum") String shopNum);
 }

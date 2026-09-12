@@ -72,6 +72,7 @@ interface Goods {
   sales: number
   goodsState: 0 | 1
   detail: string
+  picUrl?: string
   createdAt: string
 }
 interface PayOrder {
@@ -122,12 +123,16 @@ interface RefundOrder {
   id: number
   refundOrderId: string
   payOrderId: string
+  orderNum?: string
   shopNum: string
+  userNum?: string
   refundMoney: number
   refundReason: string
-  refundState: 0 | 1 | 2
+  evidence?: string | null
+  refundState: 0 | 1 | 2 | 3
   channelRefundNo: string | null
   auditRemark: string | null
+  auditTime?: string | null
   refundTime: string | null
   createdAt: string
 }
@@ -151,11 +156,11 @@ const db = {
     { wayCode: 'ALIPAY', channelName: '支付宝', switchStatus: 1, baseRate: 0.006, gatewayUrl: 'https://openapi-sandbox.dl.alipaydev.com/gateway.do', notifyKey: 'mallx-channel-key', appId: null },
     { wayCode: 'UNIONPAY', channelName: '银联支付', switchStatus: 1, baseRate: 0.005, gatewayUrl: 'https://gateway.95516.com', notifyKey: 'mallx-channel-key', appId: null },
   ],
-  mchRates: [{ shopNum: 'SH1000000001', wayCode: 'ALIPAY', mchRate: 0.004 }],
+  mchRates: [{ shopNum: 'SH417826', wayCode: 'ALIPAY', mchRate: 0.004 }],
   mchs: [
-    { id: nextId(), shopNum: 'SH1000000001', shopName: '星选数码旗舰店', shopPhone: '13800000001', shopAddress: '广东省广州市天河区科技园1栋', username: 'shop1', password: '123456', shopState: 1 as const, auditRemark: null, createdAt: iso(new Date(Date.now() - 9 * 864e5)) },
-    { id: nextId(), shopNum: 'SH1000000002', shopName: '鲜果之家', shopPhone: '13800000002', shopAddress: '广东省深圳市南山区果园路8号', username: 'shop2', password: '123456', shopState: 1 as const, auditRemark: null, createdAt: iso(new Date(Date.now() - 8 * 864e5)) },
-    { id: nextId(), shopNum: 'SH1000000003', shopName: '新申请的奶茶铺', shopPhone: '13800000003', shopAddress: '湖南省长沙市岳麓区大学城2号', username: 'shop3', password: '123456', shopState: 0 as const, auditRemark: null, createdAt: iso(new Date(Date.now() - 1 * 864e5)) },
+    { id: nextId(), shopNum: 'SH417826', shopName: '星选数码旗舰店', shopPhone: '13800000001', shopAddress: '广东省广州市天河区科技园1栋', username: 'shop1', password: '123456', shopState: 1 as const, auditRemark: null, createdAt: iso(new Date(Date.now() - 9 * 864e5)) },
+    { id: nextId(), shopNum: 'SH692051', shopName: '鲜果之家', shopPhone: '13800000002', shopAddress: '广东省深圳市南山区果园路8号', username: 'shop2', password: '123456', shopState: 1 as const, auditRemark: null, createdAt: iso(new Date(Date.now() - 8 * 864e5)) },
+    { id: nextId(), shopNum: 'SH340887', shopName: '新申请的奶茶铺', shopPhone: '13800000003', shopAddress: '湖南省长沙市岳麓区大学城2号', username: 'shop3', password: '123456', shopState: 0 as const, auditRemark: null, createdAt: iso(new Date(Date.now() - 1 * 864e5)) },
   ] as Mch[],
   users: [{ id: nextId(), userNum: 'U1000000001', username: 'user1', password: '123456', nickname: '小明' }] as User[],
   categories: [
@@ -164,25 +169,25 @@ const db = {
     { id: 3, categoryName: '服饰', parentId: 0, sort: 3 },
   ],
   goods: [
-    { id: nextId(), goodsNum: 'G1000000001', goodsName: '无线蓝牙耳机 Pro', shopNum: 'SH1000000001', categoryId: 1, price: 199.0, stock: 100, sales: 12, goodsState: 1 as const, detail: '高保真音质,40小时续航', createdAt: iso(new Date(Date.now() - 7 * 864e5)) },
-    { id: nextId(), goodsNum: 'G1000000002', goodsName: '智能机械键盘 87键', shopNum: 'SH1000000001', categoryId: 1, price: 299.0, stock: 50, sales: 8, goodsState: 1 as const, detail: '全键无冲,青轴', createdAt: iso(new Date(Date.now() - 7 * 864e5)) },
-    { id: nextId(), goodsNum: 'G1000000003', goodsName: '赣南脐橙 5斤装', shopNum: 'SH1000000002', categoryId: 2, price: 39.9, stock: 200, sales: 30, goodsState: 1 as const, detail: '产地直发,新鲜直达', createdAt: iso(new Date(Date.now() - 6 * 864e5)) },
-    { id: nextId(), goodsNum: 'G1000000004', goodsName: '智利车厘子 2斤装', shopNum: 'SH1000000002', categoryId: 2, price: 89.9, stock: 80, sales: 15, goodsState: 1 as const, detail: '空运直达,个大味甜', createdAt: iso(new Date(Date.now() - 6 * 864e5)) },
-    { id: nextId(), goodsNum: 'G1000000005', goodsName: '氮化镓充电器 65W', shopNum: 'SH1000000001', categoryId: 1, price: 129.0, stock: 60, sales: 21, goodsState: 1 as const, detail: '小巧便携,多口快充', createdAt: iso(new Date(Date.now() - 5 * 864e5)) },
-    { id: nextId(), goodsNum: 'G1000000006', goodsName: '智利车厘子 JJ级 5斤装', shopNum: 'SH1000000002', categoryId: 2, price: 219.0, stock: 40, sales: 6, goodsState: 1 as const, detail: '礼盒装,送礼佳品', createdAt: iso(new Date(Date.now() - 4 * 864e5)) },
-    { id: nextId(), goodsNum: 'G1000000007', goodsName: '新疆阿克苏苹果 9斤装', shopNum: 'SH1000000002', categoryId: 2, price: 59.9, stock: 120, sales: 18, goodsState: 1 as const, detail: '冰糖心,脆甜多汁', createdAt: iso(new Date(Date.now() - 3 * 864e5)) },
+    { id: nextId(), goodsNum: 'G728415', goodsName: '无线蓝牙耳机 Pro', shopNum: 'SH417826', categoryId: 1, price: 199.0, stock: 100, sales: 12, goodsState: 1 as const, detail: '高保真音质,40小时续航', createdAt: iso(new Date(Date.now() - 7 * 864e5)) },
+    { id: nextId(), goodsNum: 'G391647', goodsName: '智能机械键盘 87键', shopNum: 'SH417826', categoryId: 1, price: 299.0, stock: 50, sales: 8, goodsState: 1 as const, detail: '全键无冲,青轴', createdAt: iso(new Date(Date.now() - 7 * 864e5)) },
+    { id: nextId(), goodsNum: 'G562039', goodsName: '赣南脐橙 5斤装', shopNum: 'SH692051', categoryId: 2, price: 39.9, stock: 200, sales: 30, goodsState: 1 as const, detail: '产地直发,新鲜直达', createdAt: iso(new Date(Date.now() - 6 * 864e5)) },
+    { id: nextId(), goodsNum: 'G847152', goodsName: '智利车厘子 2斤装', shopNum: 'SH692051', categoryId: 2, price: 89.9, stock: 80, sales: 15, goodsState: 1 as const, detail: '空运直达,个大味甜', createdAt: iso(new Date(Date.now() - 6 * 864e5)) },
+    { id: nextId(), goodsNum: 'G193568', goodsName: '氮化镓充电器 65W', shopNum: 'SH417826', categoryId: 1, price: 129.0, stock: 60, sales: 21, goodsState: 1 as const, detail: '小巧便携,多口快充', createdAt: iso(new Date(Date.now() - 5 * 864e5)) },
+    { id: nextId(), goodsNum: 'G675214', goodsName: '智利车厘子 JJ级 5斤装', shopNum: 'SH692051', categoryId: 2, price: 219.0, stock: 40, sales: 6, goodsState: 1 as const, detail: '礼盒装,送礼佳品', createdAt: iso(new Date(Date.now() - 4 * 864e5)) },
+    { id: nextId(), goodsNum: 'G483906', goodsName: '新疆阿克苏苹果 9斤装', shopNum: 'SH692051', categoryId: 2, price: 59.9, stock: 120, sales: 18, goodsState: 1 as const, detail: '冰糖心,脆甜多汁', createdAt: iso(new Date(Date.now() - 3 * 864e5)) },
   ] as Goods[],
   payOrders: [] as PayOrder[],
   orderItems: [] as OrderItem[],
   orders: [] as BizOrder[],
   refunds: [] as RefundOrder[],
   withdraws: [
-    { id: nextId(), withdrawNo: genNo('WD'), shopNum: 'SH1000000002', money: 500, state: 1 as const, remark: '同意', finishTime: fmt(new Date(Date.now() - 2 * 864e5)), createdAt: iso(new Date(Date.now() - 3 * 864e5)) },
-    { id: nextId(), withdrawNo: genNo('WD'), shopNum: 'SH1000000002', money: 200, state: 0 as const, remark: null, finishTime: null, createdAt: iso(new Date(Date.now() - 1 * 864e5)) },
+    { id: nextId(), withdrawNo: genNo('WD'), shopNum: 'SH692051', money: 500, state: 1 as const, remark: '同意', finishTime: fmt(new Date(Date.now() - 2 * 864e5)), createdAt: iso(new Date(Date.now() - 3 * 864e5)) },
+    { id: nextId(), withdrawNo: genNo('WD'), shopNum: 'SH692051', money: 200, state: 0 as const, remark: null, finishTime: null, createdAt: iso(new Date(Date.now() - 1 * 864e5)) },
   ] as Withdraw[],
   logs: [
-    { module: 'login', content: '{"username":"admin"}', operator: 'admin', ip: '127.0.0.1', createdAt: iso(new Date(Date.now() - 2 * 36e5)) },
-    { module: 'auditMch', content: '{"shopNum":"SH1000000002","shopState":1}', operator: 'admin', ip: '127.0.0.1', createdAt: iso(new Date(Date.now() - 8 * 864e5)) },
+    { id: nextId(), module: 'login', content: '{"username":"admin"}', operator: 'admin', ip: '127.0.0.1', createdAt: iso(new Date(Date.now() - 2 * 36e5)) },
+    { id: nextId(), module: 'auditMch', content: '{"shopNum":"SH692051","shopState":1}', operator: 'admin', ip: '127.0.0.1', createdAt: iso(new Date(Date.now() - 8 * 864e5)) },
   ],
 }
 
@@ -195,7 +200,7 @@ function rateOf(shopNum: string, wayCode: string): number {
 
 /** 种子:近 7 天支付订单 + 对应业务订单(保证统计图表有数据) */
 ;(function seed() {
-  const goodsOf = ['G1000000001', 'G1000000002', 'G1000000003', 'G1000000004', 'G1000000005', 'G1000000006', 'G1000000007']
+  const goodsOf = ['G728415', 'G391647', 'G562039', 'G847152', 'G193568', 'G675214', 'G483906']
   const ways = ['WECHAT', 'ALIPAY', 'UNIONPAY']
   let i = 0
   for (let d = 6; d >= 0; d--) {
@@ -262,12 +267,16 @@ function rateOf(shopNum: string, wayCode: string): number {
           id: nextId(),
           refundOrderId: genNo('RF'),
           payOrderId: pay.payOrderId,
+          orderNum,
           shopNum: shop.shopNum,
+          userNum: 'U1000000001',
           refundMoney: round2(total / 2),
           refundReason: '商品破损,协商退款',
-          refundState: 1,
+          evidence: null,
+          refundState: 2,
           channelRefundNo: 'CH' + rand(14),
           auditRemark: '情况属实,同意退款',
+          auditTime: fmt(new Date(created.getTime() + 5 * 36e5)),
           refundTime: fmt(new Date(created.getTime() + 5 * 36e5)),
           createdAt: iso(created),
         })
@@ -317,19 +326,24 @@ function rateOf(shopNum: string, wayCode: string): number {
     })
     db.orderItems.push({ id: nextId(), orderNum, goodsNum: g.goodsNum, goodsName: g.goodsName, goodsPrice: g.price, goodsCount: 1, totalMoney: g.price })
   }
-  // 一笔退款审核中(平台端演示审核)
+  // 一笔退款待审核(用户申请,平台/商户双端可演示审核)
   {
     const pay = db.payOrders.find((p) => p.orderState === 0)!
+    const ord = db.orders.find((o) => o.payOrderId === pay.payOrderId)
     db.refunds.push({
       id: nextId(),
       refundOrderId: genNo('RF'),
       payOrderId: pay.payOrderId,
+      orderNum: ord?.orderNum,
       shopNum: pay.shopNum,
+      userNum: pay.userNum,
       refundMoney: round2(pay.money / 3),
-      refundReason: '用户重复下单',
+      refundReason: '商品质量问题：外包装有明显破损',
+      evidence: null,
       refundState: 0,
       channelRefundNo: null,
       auditRemark: null,
+      auditTime: null,
       refundTime: null,
       createdAt: iso(new Date(Date.now() - 36e5)),
     })
@@ -434,6 +448,16 @@ async function handle(method: string, path: string, body: Record<string, unknown
     ok(res, { records: db.categories.slice().sort((a, b) => a.sort - b.sort) })
     return
   }
+  /* 图形验证码（mock）：装饰性 SVG，注册时任意验证码均放行 */
+  if (path === '/captcha/image' && method === 'GET') {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="42"><rect width="120" height="42" fill="#fdeeec"/><text x="60" y="29" font-size="22" font-weight="bold" text-anchor="middle" fill="#e23a2e" font-family="monospace" letter-spacing="4">MOCK</text></svg>`
+    ok(res, {
+      captchaKey: 'mock-' + genNo('C'),
+      image: 'data:image/svg+xml;utf8,' + encodeURIComponent(svg),
+      code: 'MOCK',
+    })
+    return
+  }
 
   if (method !== 'POST') {
     fail(res, '400', '不支持的请求方式')
@@ -481,7 +505,7 @@ async function handle(method: string, path: string, body: Record<string, unknown
         auditRemark: null,
         createdAt: iso(new Date()),
       })
-      db.logs.push({ module: 'mchRegister', content: JSON.stringify({ shopNum, shopName: body.shopName }), operator: 'system', ip: '127.0.0.1', createdAt: iso(new Date()) })
+      db.logs.push({ id: nextId(), module: 'mchRegister', content: JSON.stringify({ shopNum, shopName: body.shopName }), operator: 'system', ip: '127.0.0.1', createdAt: iso(new Date()) })
       return ok(res, { message: '商户注册成功,等待审核', shopNum })
     }
     case path === '/user/register': {
@@ -743,26 +767,30 @@ async function handle(method: string, path: string, body: Record<string, unknown
       return ok(res, pageOf(list, pageNum, pageSize, view))
     }
 
-    /* ---------- 退款 ---------- */
+    /* ---------- 退款/售后 ---------- */
     case path === '/refund/create': {
       for (const k of ['payOrderId', 'refundMoney', 'refundReason', 'shopNum'])
         if (!body[k]) return fail(res, '400', `${k}不能为空`)
       const pay = db.payOrders.find((p) => p.payOrderId === body.payOrderId)
       if (!pay || pay.shopNum !== body.shopNum) return fail(res, '500', '支付订单不存在')
       if (pay.orderState !== 0) return fail(res, '500', '仅支付成功订单可退款')
-      const refunded = db.refunds.filter((r) => r.payOrderId === pay.payOrderId && r.refundState !== 2).reduce((a, r) => a + r.refundMoney, 0)
+      const refunded = db.refunds.filter((r) => r.payOrderId === pay.payOrderId && r.refundState !== 3).reduce((a, r) => a + r.refundMoney, 0)
       if (round2(refunded + Number(body.refundMoney)) > pay.money) return fail(res, '500', `退款金额超过可退余额 ${round2(pay.money - refunded)}`)
       const refundOrderId = genNo('RF')
       db.refunds.push({
         id: nextId(),
         refundOrderId,
         payOrderId: pay.payOrderId,
+        orderNum: pay.mchOrderNo,
         shopNum: String(body.shopNum),
+        userNum: pay.userNum,
         refundMoney: Number(body.refundMoney),
         refundReason: String(body.refundReason),
+        evidence: null,
         refundState: 0,
         channelRefundNo: null,
         auditRemark: null,
+        auditTime: null,
         refundTime: null,
         createdAt: iso(new Date()),
       })
@@ -775,10 +803,115 @@ async function handle(method: string, path: string, body: Record<string, unknown
         message: '查询成功',
         refundOrderId: r.refundOrderId,
         payOrderId: r.payOrderId,
+        orderNum: r.orderNum,
         refundMoney: r.refundMoney,
         refundState: r.refundState,
-        refundTime: r.refundTime,
         refundReason: r.refundReason,
+        evidence: r.evidence,
+        auditRemark: r.auditRemark,
+        auditTime: r.auditTime,
+        refundTime: r.refundTime,
+      })
+    }
+    /* 用户端:发起退款申请(订单维度,支持部分退款,可附凭证) */
+    case path === '/refund/apply': {
+      for (const k of ['orderNum', 'userNum', 'refundMoney', 'refundReason'])
+        if (!body[k]) return fail(res, '400', `${k}不能为空`)
+      const order = db.orders.find((o) => o.orderNum === body.orderNum)
+      if (!order) return fail(res, '500', '订单不存在')
+      if (order.userNum !== body.userNum) return fail(res, '500', '只能对本人订单发起退款申请')
+      if (order.orderState === 0 || order.orderState === 4) return fail(res, '500', '订单当前状态不支持退款')
+      const pay = db.payOrders.find((p) => p.payOrderId === order.payOrderId)
+      if (!pay || pay.orderState !== 0) return fail(res, '500', '该订单当前支付状态不支持退款')
+      if (db.refunds.some((r) => r.payOrderId === pay.payOrderId && (r.refundState === 0 || r.refundState === 1)))
+        return fail(res, '500', '该订单已有退款申请正在处理中，请勿重复提交')
+      const used = db.refunds.filter((r) => r.payOrderId === pay.payOrderId && r.refundState !== 3).reduce((a, r) => a + r.refundMoney, 0)
+      if (round2(used + Number(body.refundMoney)) > pay.money)
+        return fail(res, '500', `退款金额超出可退款余额 ${round2(pay.money - used)}`)
+      const refundOrderId = genNo('RF')
+      db.refunds.push({
+        id: nextId(),
+        refundOrderId,
+        payOrderId: pay.payOrderId,
+        orderNum: order.orderNum,
+        shopNum: order.shopNum,
+        userNum: order.userNum,
+        refundMoney: Number(body.refundMoney),
+        refundReason: String(body.refundReason),
+        evidence: Array.isArray(body.evidence) && body.evidence.length ? JSON.stringify(body.evidence) : null,
+        refundState: 0,
+        channelRefundNo: null,
+        auditRemark: null,
+        auditTime: null,
+        refundTime: null,
+        createdAt: iso(new Date()),
+      })
+      db.logs.push({ id: nextId(), module: 'applyRefund', content: JSON.stringify({ refundOrderId, orderNum: order.orderNum }), operator: String(body.userNum), ip: '127.0.0.1', createdAt: iso(new Date()) })
+      return ok(res, { message: '退款申请已提交，等待商户处理', refundOrderId })
+    }
+    /* 用户端:我的退款记录 */
+    case path === '/refund/user/list': {
+      const list = db.refunds.filter((r) => r.userNum === body.userNum).sort((a, b) => b.id - a.id)
+      return ok(res, pageOf(list, Number(body.pageNum || 1), Number(body.pageSize || 10)))
+    }
+    /* 退款进度详情(用户/商户按归属校验) */
+    case path === '/refund/detail': {
+      const r = db.refunds.find((x) => x.refundOrderId === body.refundOrderId)
+      if (!r) return fail(res, '500', '退款单不存在')
+      if (body.userNum && r.userNum !== body.userNum) return fail(res, '500', '退款单不存在')
+      if (body.shopNum && r.shopNum !== body.shopNum) return fail(res, '500', '退款单不存在')
+      return ok(res, { message: '查询成功', refund: r })
+    }
+    /* 上传退款凭证(mock 直接回显 dataURL 作为地址) */
+    case path === '/refund/evidence/upload': {
+      const img = String(body.imageBase64 || '')
+      if (!img.startsWith('data:image/')) return fail(res, '400', '图片数据格式不正确')
+      return ok(res, { message: '凭证上传成功', url: img })
+    }
+    /* 商户端:退款列表 */
+    case path === '/refund/mch/list': {
+      let list = db.refunds.filter((r) => r.shopNum === body.shopNum).sort((a, b) => b.id - a.id)
+      if (body.refundState !== undefined && body.refundState !== '') list = list.filter((r) => r.refundState === Number(body.refundState))
+      return ok(res, pageOf(list, Number(body.pageNum || 1), Number(body.pageSize || 10)))
+    }
+    /* 商户端:审核退款(同意执行渠道退款/拒绝) */
+    case path === '/refund/mch/audit': {
+      const r = db.refunds.find((x) => x.refundOrderId === body.refundOrderId)
+      if (!r) return fail(res, '500', '退款单不存在')
+      if (r.refundState !== 0) return fail(res, '500', '该退款单已处理，请勿重复操作')
+      const st = Number(body.auditState)
+      r.auditRemark = body.auditRemark ? String(body.auditRemark) : null
+      r.auditTime = fmt(new Date())
+      if (st === 2) {
+        r.refundState = 3
+        return ok(res, { message: '退款申请已拒绝' })
+      }
+      if (st !== 1) return fail(res, '400', 'auditState仅支持1-同意/2-拒绝')
+      r.refundState = 2
+      r.channelRefundNo = 'CH' + rand(14)
+      r.refundTime = fmt(new Date())
+      const pay = db.payOrders.find((p) => p.payOrderId === r.payOrderId)
+      if (pay) {
+        const used = db.refunds.filter((x) => x.payOrderId === r.payOrderId && x.refundState !== 3).reduce((a, x) => a + x.refundMoney, 0)
+        if (round2(used) >= pay.money) pay.orderState = 2
+      }
+      db.logs.push({ id: nextId(), module: 'auditRefundMch', content: JSON.stringify({ refundOrderId: r.refundOrderId, auditState: 1 }), operator: 'mch', ip: '127.0.0.1', createdAt: iso(new Date()) })
+      return ok(res, { message: '退款成功' })
+    }
+    /* 商户端:退款统计概览 */
+    case path === '/refund/mch/stats': {
+      const list = db.refunds.filter((r) => r.shopNum === body.shopNum)
+      const byState = (s: number) => list.filter((r) => r.refundState === s).length
+      const sum = (arr: RefundOrder[]) => round2(arr.reduce((a, r) => a + r.refundMoney, 0))
+      return ok(res, {
+        message: '查询成功',
+        waitCount: byState(0),
+        processingCount: byState(1),
+        successCount: byState(2),
+        failCount: byState(3),
+        totalCount: list.length,
+        successMoney: sum(list.filter((r) => r.refundState === 2)),
+        pendingMoney: sum(list.filter((r) => r.refundState === 0 || r.refundState === 1)),
       })
     }
 
@@ -844,7 +977,7 @@ async function handle(method: string, path: string, body: Record<string, unknown
       const pays = db.payOrders.filter((p) => p.shopNum === body.shopNum && (p.orderState === 0 || p.orderState === 2))
       const totalIncome = round2(pays.reduce((a, p) => a + p.money, 0))
       const totalServiceFee = round2(pays.reduce((a, p) => a + p.mchFee, 0))
-      const refunded = round2(db.refunds.filter((r) => r.shopNum === body.shopNum && r.refundState === 1).reduce((a, r) => a + r.refundMoney, 0))
+      const refunded = round2(db.refunds.filter((r) => r.shopNum === body.shopNum && r.refundState === 2).reduce((a, r) => a + r.refundMoney, 0))
       const withdrawn = round2(db.withdraws.filter((w) => w.shopNum === body.shopNum && w.state !== 2).reduce((a, w) => a + w.money, 0))
       return ok(res, {
         message: '查询成功',
@@ -864,7 +997,7 @@ async function handle(method: string, path: string, body: Record<string, unknown
         const pays = db.payOrders.filter((p) => p.shopNum === body.shopNum && (p.orderState === 0 || p.orderState === 2))
         const totalIncome = round2(pays.reduce((a, p) => a + p.money, 0))
         const totalServiceFee = round2(pays.reduce((a, p) => a + p.mchFee, 0))
-        const refunded = round2(db.refunds.filter((r) => r.shopNum === body.shopNum && r.refundState === 1).reduce((a, r) => a + r.refundMoney, 0))
+        const refunded = round2(db.refunds.filter((r) => r.shopNum === body.shopNum && r.refundState === 2).reduce((a, r) => a + r.refundMoney, 0))
         const withdrawn = round2(db.withdraws.filter((w) => w.shopNum === body.shopNum && w.state !== 2).reduce((a, w) => a + w.money, 0))
         resolve({ balance: Math.max(0, round2(totalIncome - totalServiceFee - refunded - withdrawn)) })
       })
@@ -889,7 +1022,7 @@ async function handle(method: string, path: string, body: Record<string, unknown
       if (st === 2 && !body.auditRemark) return fail(res, '400', '审核驳回需填写原因')
       m.shopState = st as 1 | 2
       m.auditRemark = body.auditRemark ? String(body.auditRemark) : null
-      db.logs.push({ module: 'auditMch', content: JSON.stringify({ shopNum: m.shopNum, shopState: st }), operator: 'admin', ip: '127.0.0.1', createdAt: iso(new Date()) })
+      db.logs.push({ id: nextId(), module: 'auditMch', content: JSON.stringify({ shopNum: m.shopNum, shopState: st }), operator: 'admin', ip: '127.0.0.1', createdAt: iso(new Date()) })
       return ok(res, { message: '商户审核操作成功' })
     }
     case path === '/admin/mch/list': {
@@ -917,7 +1050,7 @@ async function handle(method: string, path: string, body: Record<string, unknown
         if (body[k] !== undefined && body[k] !== null && body[k] !== '') (c as unknown as Record<string, unknown>)[k] = body[k]
       if (body.switchStatus !== undefined) c.switchStatus = Number(body.switchStatus) as 0 | 1
       if (body.baseRate !== undefined && body.baseRate !== '') c.baseRate = Number(body.baseRate)
-      db.logs.push({ module: 'configChannel', content: JSON.stringify({ wayCode: c.wayCode }), operator: 'admin', ip: '127.0.0.1', createdAt: iso(new Date()) })
+      db.logs.push({ id: nextId(), module: 'configChannel', content: JSON.stringify({ wayCode: c.wayCode }), operator: 'admin', ip: '127.0.0.1', createdAt: iso(new Date()) })
       return ok(res, { message: '支付渠道配置成功' })
     }
     case path === '/admin/channel/list':
@@ -936,21 +1069,24 @@ async function handle(method: string, path: string, body: Record<string, unknown
     case path === '/admin/refund/audit': {
       const r = db.refunds.find((x) => x.refundOrderId === body.refundOrderId)
       if (!r) return fail(res, '500', '退款订单不存在')
-      if (r.refundState !== 0) return fail(res, '500', '该退款单已审核,请勿重复操作')
+      if (r.refundState !== 0) return fail(res, '500', '该退款单已处理,请勿重复操作')
       const st = Number(body.auditState)
+      r.auditRemark = body.auditRemark ? String(body.auditRemark) : null
+      r.auditTime = fmt(new Date())
       if (st === 1) {
-        r.refundState = 1
+        r.refundState = 2
         r.channelRefundNo = 'CH' + rand(14)
         r.refundTime = fmt(new Date())
-        r.auditRemark = body.auditRemark ? String(body.auditRemark) : null
         const pay = db.payOrders.find((p) => p.payOrderId === r.payOrderId)
-        if (pay) pay.orderState = 2
-        db.logs.push({ module: 'auditRefund', content: JSON.stringify({ refundOrderId: r.refundOrderId, auditState: 1 }), operator: 'admin', ip: '127.0.0.1', createdAt: iso(new Date()) })
+        if (pay) {
+          const used = db.refunds.filter((x) => x.payOrderId === r.payOrderId && x.refundState !== 3).reduce((a, x) => a + x.refundMoney, 0)
+          if (round2(used) >= pay.money) pay.orderState = 2
+        }
+        db.logs.push({ id: nextId(), module: 'auditRefund', content: JSON.stringify({ refundOrderId: r.refundOrderId, auditState: 1 }), operator: 'admin', ip: '127.0.0.1', createdAt: iso(new Date()) })
         return ok(res, { message: '退款成功' })
       }
       if (st === 2) {
-        r.refundState = 2
-        r.auditRemark = body.auditRemark ? String(body.auditRemark) : null
+        r.refundState = 3
         return ok(res, { message: '退款申请已驳回' })
       }
       return fail(res, '400', 'auditState仅支持1-通过/2-驳回')
@@ -987,10 +1123,104 @@ async function handle(method: string, path: string, body: Record<string, unknown
       db.admins.push({ id: nextId(), username: String(body.username), password: String(body.password), realName: String(body.realName), role: (body.role === 'ADMIN' ? 'ADMIN' : 'OPS') as 'ADMIN' | 'OPS', state: 1 })
       return ok(res, { message: '后台账号创建成功' })
     }
-    case path === '/admin/user/list': {
-      const pageNum = Number(body.pageNum || 1)
-      const pageSize = Number(body.pageSize || 10)
-      return ok(res, pageOf(db.admins, pageNum, pageSize, (a) => ({ ...a, password: null })))
+    case path === '/admin/mch/delete': {
+      const idx = db.mchs.findIndex((m) => m.shopNum === body.shopNum)
+      if (idx < 0) return fail(res, '500', '商户不存在或已被删除')
+      const m = db.mchs[idx]
+      if (db.goods.some((g) => g.shopNum === m.shopNum)) return fail(res, '500', '该商户下仍有商品，请先处理商品后再删除')
+      if (db.orders.some((o) => o.shopNum === m.shopNum)) return fail(res, '500', '该商户存在业务订单，为保证交易可追溯不可删除')
+      if (db.payOrders.some((p) => p.shopNum === m.shopNum)) return fail(res, '500', '该商户存在支付订单，为保证资金可追溯不可删除')
+      if (db.refunds.some((r) => r.shopNum === m.shopNum)) return fail(res, '500', '该商户存在退款记录，为保证资金可追溯不可删除')
+      if (db.withdraws.some((w) => w.shopNum === m.shopNum)) return fail(res, '500', '该商户存在提现记录，为保证资金可追溯不可删除')
+      db.mchRates = db.mchRates.filter((r) => r.shopNum !== m.shopNum)
+      db.mchs.splice(idx, 1)
+      db.logs.push({ id: nextId(), module: 'deleteMch', content: JSON.stringify({ shopNum: m.shopNum }), operator: 'admin', ip: '127.0.0.1', createdAt: iso(new Date()) })
+      return ok(res, { message: `商户「${m.shopName}」已删除` })
+    }
+    case path === '/admin/goods/delete': {
+      const idx = db.goods.findIndex((g) => g.goodsNum === body.goodsNum)
+      if (idx < 0) return fail(res, '500', '商品不存在或已被删除')
+      const g = db.goods[idx]
+      if (db.orderItems.some((it) => it.goodsNum === g.goodsNum))
+        return fail(res, '500', '该商品已被订单引用，为保证交易可追溯不可删除，可改为下架')
+      db.goods.splice(idx, 1)
+      db.logs.push({ id: nextId(), module: 'deleteGoods', content: JSON.stringify({ goodsNum: g.goodsNum }), operator: 'admin', ip: '127.0.0.1', createdAt: iso(new Date()) })
+      return ok(res, { message: `商品「${g.goodsName}」已删除` })
+    }
+    case path === '/admin/goods/pic': {
+      const g = db.goods.find((x) => x.goodsNum === body.goodsNum)
+      if (!g) return fail(res, '500', '商品不存在或已被删除')
+      const img = String(body.imageBase64 || '')
+      if (!img.startsWith('data:image/')) return fail(res, '400', '图片数据格式不正确')
+      g.picUrl = img
+      db.logs.push({ id: nextId(), module: 'updateGoodsPic', content: JSON.stringify({ goodsNum: g.goodsNum }), operator: 'admin', ip: '127.0.0.1', createdAt: iso(new Date()) })
+      return ok(res, { message: '商品图片更新成功', picUrl: img })
+    }
+    case path === '/goods/delete': {
+      const idx = db.goods.findIndex((x) => x.goodsNum === body.goodsNum)
+      if (idx < 0) return fail(res, '500', '商品不存在或已被删除')
+      const g = db.goods[idx]
+      if (db.orderItems.some((it) => it.goodsNum === g.goodsNum))
+        return fail(res, '500', '该商品已被订单引用，为保证交易可追溯不可删除，可改为下架')
+      db.goods.splice(idx, 1)
+      db.logs.push({ id: nextId(), module: 'mchDeleteGoods', content: JSON.stringify({ goodsNum: g.goodsNum }), operator: 'merchant', ip: '127.0.0.1', createdAt: iso(new Date()) })
+      return ok(res, { message: `商品「${g.goodsName}」已删除` })
+    }
+    case path === '/admin/pay/delete': {
+      const idx = db.payOrders.findIndex((p) => p.payOrderId === body.payOrderId)
+      if (idx < 0) return fail(res, '500', '支付订单不存在或已被删除')
+      const p = db.payOrders[idx]
+      if (p.orderState === 0 || p.orderState === 2)
+        return fail(res, '500', '支付成功/已退款的订单涉及资金流向，不可删除')
+      db.payOrders.splice(idx, 1)
+      db.logs.push({ id: nextId(), module: 'deletePay', content: JSON.stringify({ payOrderId: p.payOrderId }), operator: 'admin', ip: '127.0.0.1', createdAt: iso(new Date()) })
+      return ok(res, { message: `支付订单「${p.payOrderId}」已删除` })
+    }
+    case path === '/admin/refund/delete': {
+      const idx = db.refunds.findIndex((r) => r.refundOrderId === body.refundOrderId)
+      if (idx < 0) return fail(res, '500', '退款单不存在或已被删除')
+      const r = db.refunds[idx]
+      if (r.refundState !== 3) return fail(res, '500', '仅已拒绝的记录可删除，待审核/处理中/已完成的记录须留痕')
+      db.refunds.splice(idx, 1)
+      db.logs.push({ id: nextId(), module: 'deleteRefund', content: JSON.stringify({ refundOrderId: r.refundOrderId }), operator: 'admin', ip: '127.0.0.1', createdAt: iso(new Date()) })
+      return ok(res, { message: `退款单「${r.refundOrderId}」已删除` })
+    }
+    case path === '/admin/channel/delete': {
+      const idx = db.channels.findIndex((c) => c.wayCode === body.wayCode)
+      if (idx < 0) return fail(res, '500', '渠道配置不存在或已被删除')
+      if (db.channels.length <= 1) return fail(res, '500', '系统须保留至少一个支付渠道，无法删除')
+      const c = db.channels[idx]
+      db.channels.splice(idx, 1)
+      db.logs.push({ id: nextId(), module: 'deleteChannel', content: JSON.stringify({ wayCode: c.wayCode }), operator: 'admin', ip: '127.0.0.1', createdAt: iso(new Date()) })
+      return ok(res, { message: `支付渠道「${c.channelName}」配置已删除` })
+    }
+    case path === '/admin/withdraw/delete': {
+      const idx = db.withdraws.findIndex((w) => w.withdrawNo === body.withdrawNo)
+      if (idx < 0) return fail(res, '500', '提现单不存在或已被删除')
+      const w = db.withdraws[idx]
+      if (w.state !== 2) return fail(res, '500', '仅已驳回的提现单可删除，审核中/已到账记录涉及资金流向须保留')
+      db.withdraws.splice(idx, 1)
+      db.logs.push({ id: nextId(), module: 'deleteWithdraw', content: JSON.stringify({ withdrawNo: w.withdrawNo }), operator: 'admin', ip: '127.0.0.1', createdAt: iso(new Date()) })
+      return ok(res, { message: `提现单「${w.withdrawNo}」已删除` })
+    }
+    case path === '/admin/category/delete': {
+      const cid = Number(body.categoryId)
+      const idx = db.categories.findIndex((c) => c.id === cid)
+      if (idx < 0) return fail(res, '500', '类目不存在或已被删除')
+      if (db.categories.some((c) => c.parentId === cid)) return fail(res, '500', '该类目下存在子类目，请先删除子类目')
+      if (db.goods.some((g) => g.categoryId === cid)) return fail(res, '500', '该类目下存在商品，无法删除')
+      const c = db.categories[idx]
+      db.categories.splice(idx, 1)
+      db.logs.push({ id: nextId(), module: 'deleteCategory', content: JSON.stringify({ categoryId: cid }), operator: 'admin', ip: '127.0.0.1', createdAt: iso(new Date()) })
+      return ok(res, { message: `类目「${c.categoryName}」已删除` })
+    }
+    case path === '/admin/log/delete': {
+      const lid = Number(body.id)
+      const idx = db.logs.findIndex((l) => l.id === lid)
+      if (idx < 0) return fail(res, '500', '日志不存在或已被删除')
+      db.logs.splice(idx, 1)
+      db.logs.push({ id: nextId(), module: 'deleteLog', content: JSON.stringify({ id: lid }), operator: 'admin', ip: '127.0.0.1', createdAt: iso(new Date()) })
+      return ok(res, { message: '操作日志已删除' })
     }
     case path === '/admin/log/list': {
       const pageNum = Number(body.pageNum || 1)

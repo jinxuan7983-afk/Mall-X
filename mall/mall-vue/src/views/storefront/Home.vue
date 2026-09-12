@@ -20,7 +20,7 @@
 
     <section class="grid" v-loading="loading">
       <router-link v-for="g in goods" :key="g.goodsNum" class="item mx-card" :to="`/goods/${g.goodsNum}`">
-        <div class="pic"><GoodsPic :name="g.goodsName" :seed="g.goodsNum" /></div>
+        <div class="pic"><GoodsPic :name="g.goodsName" :seed="g.goodsNum" :pic="g.picUrl || undefined" /></div>
         <div class="info">
           <div class="nm">{{ g.goodsName }}</div>
           <div class="shop">{{ g.shopName || g.shopNum }}</div>

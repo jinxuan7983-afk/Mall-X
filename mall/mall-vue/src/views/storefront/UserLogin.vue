@@ -51,16 +51,42 @@
           <el-tab-pane label="注册" name="register" />
         </el-tabs>
 
-        <el-form :model="form" @keyup.enter="submit">
-          <el-form-item>
-            <el-input v-model="form.username" placeholder="账号" size="large">
+        <el-form ref="formRef" :model="form" :rules="rules" @keyup.enter="submit">
+          <el-form-item prop="username">
+            <el-input v-model="form.username" placeholder="账号(4~20位字母/数字/下划线)" size="large">
               <template #prefix><el-icon><User /></el-icon></template>
             </el-input>
           </el-form-item>
-          <el-form-item>
-            <el-input v-model="form.password" type="password" placeholder="密码" size="large" show-password>
+          <el-form-item prop="password">
+            <el-input v-model="form.password" type="password" placeholder="密码(6~20位)" size="large" show-password>
               <template #prefix><el-icon><Lock /></el-icon></template>
             </el-input>
+          </el-form-item>
+          <el-form-item v-if="mode === 'register'" prop="confirmPassword">
+            <el-input
+              v-model="form.confirmPassword"
+              type="password"
+              placeholder="确认密码"
+              size="large"
+              show-password
+            >
+              <template #prefix><el-icon><Lock /></el-icon></template>
+            </el-input>
+          </el-form-item>
+          <el-form-item v-if="mode === 'register'" prop="captchaCode">
+            <div class="captcha-row">
+              <el-input v-model="form.captchaCode" placeholder="验证码" size="large" maxlength="4">
+                <template #prefix><el-icon><Key /></el-icon></template>
+              </el-input>
+              <img
+                v-if="captchaImg"
+                :src="captchaImg"
+                class="captcha-img"
+                title="看不清?点击刷新"
+                alt="验证码"
+                @click="loadCaptcha"
+              />
+            </div>
           </el-form-item>
           <el-button class="submit" type="primary" size="large" :loading="loading" @click="submit">
             {{ mode === 'login' ? '登录' : '注册并登录' }}
@@ -69,9 +95,7 @@
 
         <div class="demo">
           <span class="demo-label">演示账号</span>
-          <button type="button" class="chip" @click="form.username = 'user1'; form.password = '123456'">
-            user1 · 体验用户
-          </button>
+          <button type="button" class="chip" @click="fillDemo">user1 · 体验用户</button>
         </div>
 
         <div class="foot-links">
@@ -86,32 +110,88 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { User, Lock, Shop, Van, ShoppingCartFull } from '@element-plus/icons-vue'
-import { userLogin, userRegister } from '@/api/modules'
+import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import { User, Lock, Key, Shop, Van, ShoppingCartFull } from '@element-plus/icons-vue'
+import { captchaImage, userLogin, userRegister } from '@/api/modules'
 import { useSessionStore } from '@/stores/session'
 
 const route = useRoute()
 const router = useRouter()
 const session = useSessionStore()
 
+const formRef = ref<FormInstance>()
 const mode = ref<'login' | 'register'>('login')
 const loading = ref(false)
-const form = reactive({ username: '', password: '' })
+const form = reactive({ username: '', password: '', confirmPassword: '', captchaCode: '' })
+const captchaImg = ref('')
+const captchaKey = ref('')
+
+const rules: FormRules = {
+  username: [
+    { required: true, message: '请输入账号', trigger: 'blur' },
+    { pattern: /^[a-zA-Z0-9_]{4,20}$/, message: '账号需为4~20位字母、数字或下划线', trigger: 'blur' },
+  ],
+  password: [
+    { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 6, max: 20, message: '密码长度需为6~20位', trigger: 'blur' },
+  ],
+  confirmPassword: [
+    { required: true, message: '请再次输入密码', trigger: 'blur' },
+    {
+      validator: (_rule, value, callback) =>
+        value === form.password ? callback() : callback(new Error('两次输入的密码不一致')),
+      trigger: 'blur',
+    },
+  ],
+  captchaCode: [{ required: true, message: '请输入验证码', trigger: 'blur' }],
+}
+
+function fillDemo() {
+  form.username = 'user1'
+  form.password = '123456'
+  form.confirmPassword = ''
+}
+
+/** 加载图形验证码(仅注册模式使用,失败静默由提交时后端兜底) */
+async function loadCaptcha() {
+  try {
+    const r = await captchaImage()
+    captchaKey.value = r.captchaKey
+    captchaImg.value = r.image
+    form.captchaCode = ''
+  } catch {
+    /* 保持旧图,提交时后端会给出明确错误 */
+  }
+}
+
+watch(mode, (m) => {
+  formRef.value?.clearValidate()
+  if (m === 'register') loadCaptcha()
+})
 
 async function submit() {
+  if (mode.value === 'register') {
+    const valid = await formRef.value?.validate().then(() => true).catch(() => false)
+    if (!valid) return
+    loading.value = true
+    try {
+      await userRegister(form.username, form.password, captchaKey.value, form.captchaCode)
+      ElMessage.success('注册成功,已自动登录')
+    } catch {
+      loadCaptcha()
+      return
+    } finally {
+      loading.value = false
+    }
+  }
   if (!form.username || !form.password) {
     ElMessage.warning('请输入账号和密码')
     return
   }
   loading.value = true
   try {
-    if (mode.value === 'register') {
-      await userRegister(form.username, form.password)
-      ElMessage.success('注册成功,已自动登录')
-    }
     const r = await userLogin(form.username, form.password)
     session.setUser({ userNum: r.userNum, username: form.username })
     router.push(String(route.query.redirect || '/'))
@@ -247,9 +327,12 @@ async function submit() {
   align-items: flex-start;
   gap: 12px;
   padding: 12px 14px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.055);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: var(--mx-glass-fill);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  backdrop-filter: blur(10px) saturate(140%);
+  border: var(--mx-glass-border);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.22);
 }
 
 .pt-ico {
@@ -326,7 +409,26 @@ async function submit() {
 }
 
 .el-form :deep(.el-form-item) {
-  margin-bottom: 20px;
+  margin-bottom: 18px;
+}
+
+.captcha-row {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  align-items: center;
+}
+
+.captcha-row :deep(.el-input) {
+  flex: 1;
+}
+
+.captcha-img {
+  height: 40px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid var(--mx-line);
+  flex: none;
 }
 
 .submit {

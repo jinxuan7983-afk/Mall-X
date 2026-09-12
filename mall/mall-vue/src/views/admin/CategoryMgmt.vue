@@ -17,7 +17,7 @@
       <el-table-column label="排序" width="110" align="right">
         <template #default="{ row }"><span class="num">{{ row.sort }}</span></template>
       </el-table-column>
-      <el-table-column label="操作" width="200" align="center">
+      <el-table-column label="操作" width="260" align="center">
         <template #default="{ row }">
           <template v-if="editingId === row.id">
             <el-button link type="success" @click="saveEdit(row)">保存</el-button>
@@ -26,6 +26,7 @@
           <template v-else>
             <el-button link type="primary" @click="startEdit(row)">重命名</el-button>
             <el-button link type="primary" @click="openCreate(row.id)">添加子类目</el-button>
+            <el-button v-if="canDelete" link type="danger" @click="remove(row)">删除</el-button>
           </template>
         </template>
       </el-table-column>
@@ -52,7 +53,8 @@
 import { onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
-import { categoryList, categorySave } from '@/api/modules'
+import { adminCategoryDelete, categoryList, categorySave } from '@/api/modules'
+import { useAdminDelete } from '@/composables/useAdminDelete'
 import type { Category } from '@/types'
 
 const records = ref<Category[]>([])
@@ -113,6 +115,19 @@ async function save() {
   } finally {
     saving.value = false
   }
+}
+
+const { canDelete, adminDelete } = useAdminDelete()
+
+/** 删除类目:存在子类目或商品引用时禁止删除(后端校验兜底) */
+async function remove(row: Category) {
+  const ok = await adminDelete(
+    `类目「${row.categoryName}」`,
+    '存在子类目或商品引用的类目不可删除。',
+    (t) => adminCategoryDelete(row.id, t),
+    `类目「${row.categoryName}」已删除`,
+  )
+  if (ok) load()
 }
 
 onMounted(load)

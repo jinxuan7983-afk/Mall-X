@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -32,6 +33,13 @@ public class GoodsController {
     @PostMapping("/update")
     public R update(@Valid @RequestBody GoodsReq req) {
         return goodsService.update(req);
+    }
+
+    /** 商户删除自有商品（仅商品归属商户可执行；被订单引用时禁止删除） */
+    @PostMapping("/delete")
+    public R delete(@RequestBody Map<String, Object> req,
+                    @RequestHeader(value = "X-Mch-Token", required = false) String operatorToken) {
+        return goodsService.mchDelete(strOf(req, "goodsNum"), operatorToken);
     }
 
     /** 商品分页列表 */

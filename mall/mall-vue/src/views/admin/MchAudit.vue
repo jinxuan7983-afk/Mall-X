@@ -11,27 +11,27 @@
     </div>
 
     <el-table :data="records" v-loading="loading" border stripe>
-      <el-table-column label="商户" min-width="200">
+      <el-table-column label="商户" min-width="190">
         <template #default="{ row }">
           <div class="nm">{{ row.shopName }}</div>
           <div class="muted num">{{ row.shopNum }}</div>
         </template>
       </el-table-column>
       <el-table-column prop="username" label="账号" width="110" />
-      <el-table-column prop="shopPhone" label="电话" width="130">
+      <el-table-column prop="shopPhone" label="电话" width="118">
         <template #default="{ row }"><span class="num">{{ row.shopPhone }}</span></template>
       </el-table-column>
-      <el-table-column prop="shopAddress" label="经营地址" min-width="180" show-overflow-tooltip />
+      <el-table-column prop="shopAddress" label="经营地址" min-width="160" show-overflow-tooltip />
       <el-table-column label="状态" width="96" align="center">
         <template #default="{ row }"><StateTag kind="shop" :value="row.shopState" /></template>
       </el-table-column>
-      <el-table-column label="审核备注" min-width="130" show-overflow-tooltip>
+      <el-table-column label="审核备注" min-width="120" show-overflow-tooltip>
         <template #default="{ row }">{{ row.auditRemark || '—' }}</template>
       </el-table-column>
       <el-table-column label="入驻时间" width="110">
         <template #default="{ row }"><span class="small num">{{ fmtTime(row.createdAt).slice(0, 10) }}</span></template>
       </el-table-column>
-      <el-table-column label="操作" width="230" align="center" fixed="right">
+      <el-table-column label="操作" width="240" align="center" fixed="right">
         <template #default="{ row }">
           <template v-if="row.shopState === 0">
             <el-button link type="success" @click="audit(row, 1)">通过</el-button>
@@ -44,6 +44,7 @@
             <el-button link type="success" @click="enable(row)">启用</el-button>
           </template>
           <el-button link type="primary" @click="openRate(row)">费率</el-button>
+          <el-button v-if="canDelete" link type="danger" @click="remove(row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -80,8 +81,9 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
-import { adminMchAudit, adminMchList, adminMchRate } from '@/api/modules'
+import { adminMchAudit, adminMchDelete, adminMchList, adminMchRate } from '@/api/modules'
 import { fmtTime } from '@/api/client'
+import { useAdminDelete } from '@/composables/useAdminDelete'
 import type { Mch } from '@/types'
 import StateTag from '@/components/StateTag.vue'
 
@@ -138,6 +140,22 @@ async function enable(row: Mch) {
   await adminMchAudit(row.shopNum, 1, '重新启用')
   ElMessage.success('已启用')
   load()
+}
+
+const { canDelete, adminDelete } = useAdminDelete()
+
+/** 删除商户:仅无商品/订单/资金等业务数据的商户可删,后端校验兜底 */
+async function remove(row: Mch) {
+  const ok = await adminDelete(
+    `商户「${row.shopName}」(${row.shopNum})`,
+    '仅无商品、订单与资金记录的商户可删除,删除后不可恢复。',
+    (t) => adminMchDelete(row.shopNum, t),
+    `商户「${row.shopName}」已删除`,
+  )
+  if (ok) {
+    if (records.value.length === 1 && page.value > 1) page.value -= 1
+    load()
+  }
 }
 
 function openRate(row: Mch) {

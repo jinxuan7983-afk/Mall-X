@@ -112,19 +112,24 @@ CREATE TABLE IF NOT EXISTS t_refund_order (
     id               BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键',
     refund_order_id  VARCHAR(64)   NOT NULL COMMENT '退款订单唯一编号',
     pay_order_id     VARCHAR(64)   NOT NULL COMMENT '原支付订单号',
+    order_num        VARCHAR(64)   DEFAULT NULL COMMENT '关联业务订单号(用户端按订单申请时记录)',
     shop_num         VARCHAR(32)   NOT NULL COMMENT '商户编号',
+    user_num         VARCHAR(32)   DEFAULT NULL COMMENT '申请用户编号(用户端发起时记录)',
     refund_money     DECIMAL(12,2) NOT NULL COMMENT '退款金额',
     refund_reason    VARCHAR(255)  DEFAULT NULL COMMENT '退款原因',
-    refund_state     TINYINT       NOT NULL DEFAULT 0 COMMENT '退款状态 0-审核中 1-退款成功 2-退款失败',
+    evidence         VARCHAR(1024) DEFAULT NULL COMMENT '退款凭证图片地址(JSON数组)',
+    refund_state     TINYINT       NOT NULL DEFAULT 0 COMMENT '退款状态 0-待审核 1-处理中 2-已完成 3-已拒绝',
     channel_refund_no VARCHAR(64)  DEFAULT NULL COMMENT '渠道退款流水号',
-    audit_remark     VARCHAR(255)  DEFAULT NULL COMMENT '审核备注',
+    audit_remark     VARCHAR(255)  DEFAULT NULL COMMENT '审核/处理备注',
+    audit_time       DATETIME      DEFAULT NULL COMMENT '审核时间',
     refund_time      DATETIME      DEFAULT NULL COMMENT '退款完成时间',
     created_at       DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at       DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (id),
     UNIQUE KEY uk_refund_order_id (refund_order_id),
     KEY idx_refund_pay (pay_order_id),
-    KEY idx_refund_shop (shop_num)
+    KEY idx_refund_shop (shop_num),
+    KEY idx_refund_user (user_num)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '退款订单';
 
 -- 平台用户（消费者）

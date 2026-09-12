@@ -20,9 +20,10 @@
       <el-table-column label="网关地址" min-width="220">
         <template #default="{ row }"><span class="small muted">{{ row.gatewayUrl || '—' }}</span></template>
       </el-table-column>
-      <el-table-column label="操作" width="100" align="center" fixed="right">
+      <el-table-column label="操作" width="160" align="center" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="openEdit(row)">配置</el-button>
+          <el-button v-if="canDelete" link type="danger" @click="remove(row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -59,7 +60,8 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { channelConfig, channelList } from '@/api/modules'
+import { adminChannelDelete, channelConfig, channelList } from '@/api/modules'
+import { useAdminDelete } from '@/composables/useAdminDelete'
 import type { ChannelConfig } from '@/types'
 import StateTag from '@/components/StateTag.vue'
 
@@ -120,6 +122,19 @@ async function save() {
   } finally {
     saving.value = false
   }
+}
+
+const { canDelete, adminDelete } = useAdminDelete()
+
+/** 删除渠道配置:系统须保留至少一个支付渠道(后端校验兜底) */
+async function remove(row: ChannelConfig) {
+  const ok = await adminDelete(
+    `支付渠道「${row.channelName}」(${row.wayCode})`,
+    '删除后该渠道将无法用于收款,系统须保留至少一个支付渠道。',
+    (t) => adminChannelDelete(row.wayCode, t),
+    `支付渠道「${row.channelName}」配置已删除`,
+  )
+  if (ok) load()
 }
 
 onMounted(load)

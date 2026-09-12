@@ -8,11 +8,15 @@ export interface MchSession {
   shopNum: string
   shopName: string
   shopState: 0 | 1 | 2
+  /** 登录令牌:商户端敏感操作(如删除商品)随请求头提交,由后端校验身份与商品归属 */
+  token?: string
 }
 export interface AdminSession {
   username: string
   realName: string
   role: 'ADMIN' | 'OPS'
+  /** 登录令牌:管理端敏感操作(删除等)随请求头提交,由后端校验身份与角色 */
+  token?: string
 }
 
 function load<T>(key: string): T | null {

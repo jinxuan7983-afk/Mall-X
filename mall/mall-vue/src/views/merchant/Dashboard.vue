@@ -22,8 +22,11 @@
     <h2 class="mx-page-title">今日经营概览</h2>
     <el-row :gutter="14">
       <el-col :span="6" v-for="c in cards" :key="c.label">
-        <div class="mx-card mx-stat">
-          <div class="label">{{ c.label }}</div>
+        <div class="mx-card mx-stat" :class="{ accent: c.price }">
+          <div class="stat-top">
+            <div class="label">{{ c.label }}</div>
+            <el-icon class="stat-ico"><component :is="c.icon" /></el-icon>
+          </div>
           <div class="value" :class="{ price: c.price }">{{ c.value }}</div>
         </div>
       </el-col>
@@ -49,10 +52,10 @@
         <div class="mx-card quick">
           <div class="chart-head">快捷入口</div>
           <div class="qrow">
-            <el-button @click="$router.push('/mch/goods')">发布商品</el-button>
-            <el-button @click="$router.push('/mch/orders')">处理发货</el-button>
-            <el-button @click="$router.push('/mch/refund')">发起退款</el-button>
-            <el-button @click="$router.push('/mch/fund')">申请提现</el-button>
+            <el-button :icon="Plus" @click="$router.push('/mch/goods')">发布商品</el-button>
+            <el-button :icon="Van" @click="$router.push('/mch/orders')">处理发货</el-button>
+            <el-button :icon="RefreshLeft" @click="$router.push('/mch/refund')">发起退款</el-button>
+            <el-button :icon="Wallet" @click="$router.push('/mch/fund')">申请提现</el-button>
           </div>
         </div>
       </el-col>
@@ -62,6 +65,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { Plus, Van, RefreshLeft, Wallet } from '@element-plus/icons-vue'
 import { statisMch, fundOverview } from '@/api/modules'
 import { money } from '@/api/client'
 import { useSessionStore } from '@/stores/session'
@@ -73,10 +77,10 @@ const session = useSessionStore()
 const shopNum = computed(() => session.mch!.shopNum)
 
 const cards = ref([
-  { label: '累计营收(元)', value: '—', price: true },
-  { label: '累计手续费(元)', value: '—', price: false },
-  { label: '实际净收益(元)', value: '—', price: true },
-  { label: '可提现余额(元)', value: '—', price: true },
+  { label: '累计营收(元)', value: '—', price: true, icon: 'Money' },
+  { label: '累计手续费(元)', value: '—', price: false, icon: 'Tickets' },
+  { label: '实际净收益(元)', value: '—', price: true, icon: 'TrendCharts' },
+  { label: '可提现余额(元)', value: '—', price: true, icon: 'Wallet' },
 ])
 
 const lineEl = ref<HTMLElement>() as Ref<HTMLElement | undefined>
@@ -91,10 +95,10 @@ onMounted(async () => {
   try {
     const [st, fund] = await Promise.all([statisMch(shopNum.value), fundOverview(shopNum.value)])
     cards.value = [
-      { label: '累计营收(元)', value: money(st.totalIncome), price: true },
-      { label: '累计手续费(元)', value: money(st.totalServiceFee), price: false },
-      { label: '实际净收益(元)', value: money(st.actualIncome), price: true },
-      { label: '可提现余额(元)', value: money(fund.fund.balance), price: true },
+      { label: '累计营收(元)', value: money(st.totalIncome), price: true, icon: 'Money' },
+      { label: '累计手续费(元)', value: money(st.totalServiceFee), price: false, icon: 'Tickets' },
+      { label: '实际净收益(元)', value: money(st.actualIncome), price: true, icon: 'TrendCharts' },
+      { label: '可提现余额(元)', value: money(fund.fund.balance), price: true, icon: 'Wallet' },
     ]
     lineOpt.value = {
       ...chartBase,

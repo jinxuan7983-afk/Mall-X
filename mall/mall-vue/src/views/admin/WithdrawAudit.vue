@@ -7,32 +7,33 @@
     </div>
 
     <el-table :data="records" v-loading="loading" border stripe>
-      <el-table-column label="提现单号" min-width="190">
+      <el-table-column label="提现单号" min-width="180" show-overflow-tooltip>
         <template #default="{ row }"><span class="small num">{{ row.withdrawNo }}</span></template>
       </el-table-column>
-      <el-table-column label="商户" width="160">
+      <el-table-column label="商户" width="130">
         <template #default="{ row }"><span class="small num">{{ row.shopNum }}</span></template>
       </el-table-column>
-      <el-table-column label="金额" width="120" align="right">
+      <el-table-column label="金额" width="110" align="right">
         <template #default="{ row }"><span class="price">¥{{ money(row.money) }}</span></template>
       </el-table-column>
-      <el-table-column label="状态" width="100" align="center">
+      <el-table-column label="状态" width="92" align="center">
         <template #default="{ row }"><StateTag kind="withdraw" :value="row.state" /></template>
       </el-table-column>
-      <el-table-column prop="remark" label="备注" min-width="140" />
-      <el-table-column label="申请时间" width="170">
+      <el-table-column prop="remark" label="备注" min-width="120" />
+      <el-table-column label="申请时间" width="150">
         <template #default="{ row }"><span class="small num">{{ fmtTime(row.createdAt) }}</span></template>
       </el-table-column>
-      <el-table-column label="完成时间" width="170">
+      <el-table-column label="完成时间" width="150">
         <template #default="{ row }"><span class="small num">{{ fmtTime(row.finishTime) }}</span></template>
       </el-table-column>
-      <el-table-column label="操作" width="120" align="center" fixed="right">
+      <el-table-column label="操作" width="175" align="center" fixed="right">
         <template #default="{ row }">
           <template v-if="row.state === 0">
             <el-button link type="success" @click="audit(row, 1)">通过</el-button>
             <el-button link type="danger" @click="audit(row, 2)">驳回</el-button>
           </template>
           <span v-else class="muted">已处理</span>
+          <el-button v-if="canDelete" link type="danger" @click="remove(row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -47,8 +48,9 @@
 import { onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
-import { adminWithdrawList, withdrawAudit } from '@/api/modules'
+import { adminWithdrawDelete, adminWithdrawList, withdrawAudit } from '@/api/modules'
 import { fmtTime, money } from '@/api/client'
+import { useAdminDelete } from '@/composables/useAdminDelete'
 import type { Withdraw } from '@/types'
 import StateTag from '@/components/StateTag.vue'
 
@@ -81,6 +83,22 @@ async function audit(row: Withdraw, state: 1 | 2) {
   await withdrawAudit(row.withdrawNo, state, remark)
   ElMessage.success('提现审核完成')
   load()
+}
+
+const { canDelete, adminDelete } = useAdminDelete()
+
+/** 删除提现单:仅已驳回可删,审核中/已到账涉及资金流向不可删(后端校验兜底) */
+async function remove(row: Withdraw) {
+  const ok = await adminDelete(
+    `提现单「${row.withdrawNo}」`,
+    '仅已驳回的提现单可删除,审核中与已到账记录涉及资金流向不可删除。',
+    (t) => adminWithdrawDelete(row.withdrawNo, t),
+    `提现单「${row.withdrawNo}」已删除`,
+  )
+  if (ok) {
+    if (records.value.length === 1 && page.value > 1) page.value -= 1
+    load()
+  }
 }
 
 onMounted(load)

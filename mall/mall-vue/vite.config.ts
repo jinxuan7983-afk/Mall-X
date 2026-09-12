@@ -22,6 +22,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/api/, ''),
       },
+      // 上传的商品图片由 mall-mgr 提供（/uploads/** 静态映射）
+      '/uploads': {
+        target: 'http://127.0.0.1:10010',
+        changeOrigin: true,
+      },
     },
   },
 })

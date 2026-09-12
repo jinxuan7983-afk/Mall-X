@@ -1,6 +1,6 @@
 <template>
   <div v-if="goods" class="detail">
-    <div class="mx-card left"><GoodsPic :name="goods.goodsName" :seed="goods.goodsNum" big /></div>
+    <div class="mx-card left"><GoodsPic :name="goods.goodsName" :seed="goods.goodsNum" :pic="goods.picUrl || undefined" big /></div>
     <div class="right">
       <h1>{{ goods.goodsName }}</h1>
       <div class="pricebar">

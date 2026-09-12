@@ -21,7 +21,7 @@ spring:
         - id: mall-mgr
           uri: lb://mall-mgr
           predicates:
-            - Path=/mch/**,/admin/**,/statis/**,/refund/**,/goods/**,/order/**,/user/**,/fund/**,/category/**
+            - Path=/mch/**,/admin/**,/statis/**,/refund/**,/goods/**,/order/**,/user/**,/fund/**,/category/**,/captcha/**,/uploads/**
         # 支付微服务：统一支付下单/回调/订单查询
         - id: mall-alipay
           uri: lb://mall-alipay

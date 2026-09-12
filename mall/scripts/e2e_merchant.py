@@ -16,7 +16,7 @@ from playwright.sync_api import sync_playwright
 BASE = "http://localhost:5173"
 GW = "http://127.0.0.1:10010"
 SECRET = "mallx-pay-secret-2026"
-SHOP1 = "SH1000000001"
+SHOP1 = "SH417826"
 OUT = r"C:\毕业设计\多商家电商平台\mall\test-results"
 os.makedirs(OUT, exist_ok=True)
 
@@ -46,11 +46,21 @@ def api_post(path, params):
         return json.loads(resp.read().decode("utf-8"))
 
 
+def wait_state(page, row_text, tag_text, timeout=8000):
+    """等待目标行内的状态标签(StateTag 组件)翻转为指定文案,规避异步刷新竞态"""
+    try:
+        page.locator(".el-table__row", has_text=row_text).first.locator(
+            ".state-tag", has_text=tag_text).first.wait_for(state="visible", timeout=timeout)
+        return True
+    except Exception:
+        return False
+
+
 def prep_paid_order():
     """给 shop1 预置一笔已支付订单，等待 MQ 翻待发货"""
     r = api_post("/order/create", {
         "userNum": "U1000000001", "shopNum": SHOP1,
-        "items": [{"goodsNum": "G1000000001", "count": 1}],
+        "items": [{"goodsNum": "G728415", "count": 1}],
         "receiverName": "小明", "receiverPhone": "13900000001", "receiverAddress": "广州市天河区1号"})
     if r.get("id") != "0":
         return None, f"order/create: {r}"
@@ -133,11 +143,11 @@ with sync_playwright() as p:
         row.get_by_role("button", name="下架").click()
         page.wait_for_timeout(1500)
         row = page.locator(".el-table__row", has_text="E2E测试商品A").first
-        ok1 = row.locator(".el-tag", has_text="下架").count() > 0
+        ok1 = row.locator(".state-tag", has_text="下架").count() > 0
         row.get_by_role("button", name="上架").click()
         page.wait_for_timeout(1500)
         row = page.locator(".el-table__row", has_text="E2E测试商品A").first
-        ok2 = row.locator(".el-tag", has_text="上架").count() > 0
+        ok2 = row.locator(".state-tag", has_text="上架").count() > 0
         step("商品下架/上架切换(BUG-02回归)", ok1 and ok2, f"off={ok1} on={ok2}")
     except Exception:
         traceback.print_exc(); step("商品上下架", False, "exception")
@@ -159,8 +169,7 @@ with sync_playwright() as p:
             page.screenshot(path=f"{OUT}\\24_deliver_dialog.png")
             page.get_by_role("button", name="确认发货").click()
             page.wait_for_timeout(1500)
-            prep_row = page.locator(".el-table__row", has_text=order_num)
-            step(f"预置订单({order_num})流转已发货", prep_row.locator(".el-tag", has_text="已发货").count() > 0)
+            step(f"预置订单({order_num})流转已发货", wait_state(page, order_num, "已发货"))
             page.screenshot(path=f"{OUT}\\25_mch_orders_after.png", full_page=True)
     except Exception:
         traceback.print_exc(); step("订单发货", False, "exception")
@@ -184,23 +193,31 @@ with sync_playwright() as p:
     except Exception:
         traceback.print_exc(); step("交易流水退款", False, "exception")
 
-    # 6. 退款管理：查询退款进度
+    # 6. 退款管理：统计概览 + 商户端审核（拒绝本次发起的申请）
     try:
         page.locator(".el-menu-item", has_text="退款管理").click()
-        page.wait_for_timeout(800)
-        step("退款流程步骤条渲染", page.locator(".el-steps").count() > 0)
-        r2 = api_post("/admin/refund/list", {"pageNum": 1, "pageSize": 20})
-        rid = next((rec.get("refundOrderId") for rec in r2.get("records", [])
-                    if rec.get("shopNum") == SHOP1 and rec.get("refundState") == 0), None)
+        page.wait_for_timeout(1200)
+        step("退款统计卡渲染(4 项)", page.locator(".statgrid .stat").count() == 4)
+        step("退款列表已加载", page.locator(".el-table__row").count() > 0)
+        page.screenshot(path=f"{OUT}\\28_refund_mgmt.png", full_page=True)
+
+        r2 = api_post("/refund/mch/list", {"shopNum": SHOP1, "pageNum": 1, "pageSize": 20, "refundState": 0})
+        rid = next((rec.get("refundOrderId") for rec in r2.get("records", [])), None)
         if rid:
-            page.get_by_placeholder("输入退款单号查询进度").fill(rid)
-            page.get_by_role("button", name="查询进度").click()
-            page.wait_for_timeout(1200)
-            body = page.inner_text("body")
-            step("退款进度显示审核中", "审核中" in body)
-            page.screenshot(path=f"{OUT}\\28_refund_progress.png", full_page=True)
+            row = page.locator(".el-table__row", has_text=rid)
+            step("待审核退款单在列表中", row.count() > 0, rid)
+            row.get_by_role("button", name="拒绝").click()
+            page.wait_for_timeout(700)
+            dialog = page.locator(".el-message-box")
+            step("拒绝弹窗出现", dialog.count() > 0)
+            dialog.locator("input").fill("E2E自动化：不符合退款条件")
+            dialog.get_by_role("button", name="确认拒绝").click()
+            page.wait_for_timeout(1800)
+            step("退款状态翻已拒绝", wait_state(page, rid, "已拒绝"))
+            step("拒绝反馈提示可见", page.locator(".el-message", has_text="已拒绝").count() > 0)
         else:
-            step("退款进度查询", False, "未查到shop1审核中退款单")
+            step("退款管理审核", False, "未查到待审核退款单")
+        page.screenshot(path=f"{OUT}\\28b_refund_audit.png", full_page=True)
     except Exception:
         traceback.print_exc(); step("退款管理", False, "exception")
 

@@ -17,16 +17,17 @@ public class JwtUtil {
     public static final String CLAIM_TYPE = "userType";
     public static final String CLAIM_NAME = "name";
 
-    private static final long TTL_MILLIS = 7L * 24 * 3600 * 1000;
+    /** 有效期 7 天（JWT 标准 iat/exp 为秒级时间戳，勿用毫秒） */
+    private static final long TTL_SECONDS = 7L * 24 * 3600;
 
     public static String create(String secret, String num, String userType, String name) {
-        long now = System.currentTimeMillis();
+        long nowSeconds = System.currentTimeMillis() / 1000;
         Map<String, Object> payload = new HashMap<>();
         payload.put(CLAIM_NUM, num);
         payload.put(CLAIM_TYPE, userType);
         payload.put(CLAIM_NAME, name);
-        payload.put(JWTPayload.ISSUED_AT, now);
-        payload.put(JWTPayload.EXPIRES_AT, now + TTL_MILLIS);
+        payload.put(JWTPayload.ISSUED_AT, nowSeconds);
+        payload.put(JWTPayload.EXPIRES_AT, nowSeconds + TTL_SECONDS);
         return JWTUtil.createToken(payload, secret.getBytes(StandardCharsets.UTF_8));
     }
 

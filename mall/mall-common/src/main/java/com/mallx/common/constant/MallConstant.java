@@ -22,10 +22,11 @@ public final class MallConstant {
     public static final int CALLBACK_SUCCESS = 0;
     public static final int CALLBACK_FAIL = 1;
 
-    /** ===== 退款状态：0-审核中 1-退款成功 2-退款失败 ===== */
+    /** ===== 退款状态：0-待审核 1-处理中(审核通过,渠道退款执行中) 2-已完成 3-已拒绝(审核拒绝或渠道退款失败) ===== */
     public static final int REFUND_WAIT = 0;
-    public static final int REFUND_SUCCESS = 1;
-    public static final int REFUND_FAIL = 2;
+    public static final int REFUND_PROCESSING = 1;
+    public static final int REFUND_SUCCESS = 2;
+    public static final int REFUND_FAIL = 3;
 
     /** ===== 商户状态：0-待审核 1-正常 2-禁用 ===== */
     public static final int MCH_WAIT_AUDIT = 0;
