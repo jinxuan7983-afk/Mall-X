@@ -143,6 +143,9 @@ async function simulateConfirm(o: PayCtx) {
 }
 
 async function pay(o: PayCtx) {
+  // 必须先在用户点击的同步调用栈里开窗：await payCreate 之后再调用 window.open
+  // 已脱离用户手势，会被浏览器弹窗拦截（表现为"已跳转支付"却没有收银台页面）。
+  const win = window.open('', '_blank')
   o.loading = true
   try {
     const r = await payCreate({
@@ -159,9 +162,16 @@ async function pay(o: PayCtx) {
     o.payUrl = r.payUrl
     o.state = 'paying'
     o.polls = 0
-    openCashier(o)
+    if (win && o.payUrl) {
+      // 复用同步打开的窗口，规避弹窗拦截
+      win.location.href = o.payUrl
+    } else {
+      win?.close()
+      openCashier(o)
+    }
     startPolling()
   } catch (e) {
+    win?.close()
     o.state = 'fail'
     o.error = e instanceof Error ? e.message : '下单失败'
   } finally {

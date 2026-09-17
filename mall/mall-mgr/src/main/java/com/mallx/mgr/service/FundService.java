@@ -116,7 +116,7 @@ public class FundService {
 
     /**
      * 平台删除提现单（仅 ADMIN 可执行）。
-     * 删除策略：仅已驳回记录可删；审核中/已到账涉及资金流向，须留痕禁止删除。
+     * 超级管理员不受状态限制：经前端确认后任意状态的提现单均可物理删除。
      */
     public R deleteWithdraw(String withdrawNo, String operatorToken) {
         adminGuard.requireAdmin(operatorToken);
@@ -127,9 +127,6 @@ public class FundService {
                 .eq(Withdraw::getWithdrawNo, withdrawNo));
         if (w == null) {
             throw new BizException("提现单不存在或已被删除");
-        }
-        if (w.getState() != MallConstant.WITHDRAW_FAIL) {
-            throw new BizException("仅已驳回的提现单可删除，审核中/已到账记录涉及资金流向须保留");
         }
         withdrawMapper.deleteById(w.getId());
         return R.ok("提现单「" + withdrawNo + "」已删除");

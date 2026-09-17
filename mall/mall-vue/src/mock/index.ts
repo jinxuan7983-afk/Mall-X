@@ -1127,11 +1127,7 @@ async function handle(method: string, path: string, body: Record<string, unknown
       const idx = db.mchs.findIndex((m) => m.shopNum === body.shopNum)
       if (idx < 0) return fail(res, '500', '商户不存在或已被删除')
       const m = db.mchs[idx]
-      if (db.goods.some((g) => g.shopNum === m.shopNum)) return fail(res, '500', '该商户下仍有商品，请先处理商品后再删除')
-      if (db.orders.some((o) => o.shopNum === m.shopNum)) return fail(res, '500', '该商户存在业务订单，为保证交易可追溯不可删除')
-      if (db.payOrders.some((p) => p.shopNum === m.shopNum)) return fail(res, '500', '该商户存在支付订单，为保证资金可追溯不可删除')
-      if (db.refunds.some((r) => r.shopNum === m.shopNum)) return fail(res, '500', '该商户存在退款记录，为保证资金可追溯不可删除')
-      if (db.withdraws.some((w) => w.shopNum === m.shopNum)) return fail(res, '500', '该商户存在提现记录，为保证资金可追溯不可删除')
+      // 超级管理员删除不受业务数据限制
       db.mchRates = db.mchRates.filter((r) => r.shopNum !== m.shopNum)
       db.mchs.splice(idx, 1)
       db.logs.push({ id: nextId(), module: 'deleteMch', content: JSON.stringify({ shopNum: m.shopNum }), operator: 'admin', ip: '127.0.0.1', createdAt: iso(new Date()) })
@@ -1141,8 +1137,7 @@ async function handle(method: string, path: string, body: Record<string, unknown
       const idx = db.goods.findIndex((g) => g.goodsNum === body.goodsNum)
       if (idx < 0) return fail(res, '500', '商品不存在或已被删除')
       const g = db.goods[idx]
-      if (db.orderItems.some((it) => it.goodsNum === g.goodsNum))
-        return fail(res, '500', '该商品已被订单引用，为保证交易可追溯不可删除，可改为下架')
+      // 超级管理员删除不受订单引用限制
       db.goods.splice(idx, 1)
       db.logs.push({ id: nextId(), module: 'deleteGoods', content: JSON.stringify({ goodsNum: g.goodsNum }), operator: 'admin', ip: '127.0.0.1', createdAt: iso(new Date()) })
       return ok(res, { message: `商品「${g.goodsName}」已删除` })
@@ -1170,8 +1165,7 @@ async function handle(method: string, path: string, body: Record<string, unknown
       const idx = db.payOrders.findIndex((p) => p.payOrderId === body.payOrderId)
       if (idx < 0) return fail(res, '500', '支付订单不存在或已被删除')
       const p = db.payOrders[idx]
-      if (p.orderState === 0 || p.orderState === 2)
-        return fail(res, '500', '支付成功/已退款的订单涉及资金流向，不可删除')
+      // 超级管理员删除不受支付状态限制
       db.payOrders.splice(idx, 1)
       db.logs.push({ id: nextId(), module: 'deletePay', content: JSON.stringify({ payOrderId: p.payOrderId }), operator: 'admin', ip: '127.0.0.1', createdAt: iso(new Date()) })
       return ok(res, { message: `支付订单「${p.payOrderId}」已删除` })
@@ -1180,7 +1174,7 @@ async function handle(method: string, path: string, body: Record<string, unknown
       const idx = db.refunds.findIndex((r) => r.refundOrderId === body.refundOrderId)
       if (idx < 0) return fail(res, '500', '退款单不存在或已被删除')
       const r = db.refunds[idx]
-      if (r.refundState !== 3) return fail(res, '500', '仅已拒绝的记录可删除，待审核/处理中/已完成的记录须留痕')
+      // 超级管理员删除不受退款状态限制
       db.refunds.splice(idx, 1)
       db.logs.push({ id: nextId(), module: 'deleteRefund', content: JSON.stringify({ refundOrderId: r.refundOrderId }), operator: 'admin', ip: '127.0.0.1', createdAt: iso(new Date()) })
       return ok(res, { message: `退款单「${r.refundOrderId}」已删除` })
@@ -1188,7 +1182,7 @@ async function handle(method: string, path: string, body: Record<string, unknown
     case path === '/admin/channel/delete': {
       const idx = db.channels.findIndex((c) => c.wayCode === body.wayCode)
       if (idx < 0) return fail(res, '500', '渠道配置不存在或已被删除')
-      if (db.channels.length <= 1) return fail(res, '500', '系统须保留至少一个支付渠道，无法删除')
+      // 超级管理员删除不受「至少保留一个渠道」限制
       const c = db.channels[idx]
       db.channels.splice(idx, 1)
       db.logs.push({ id: nextId(), module: 'deleteChannel', content: JSON.stringify({ wayCode: c.wayCode }), operator: 'admin', ip: '127.0.0.1', createdAt: iso(new Date()) })
@@ -1198,7 +1192,7 @@ async function handle(method: string, path: string, body: Record<string, unknown
       const idx = db.withdraws.findIndex((w) => w.withdrawNo === body.withdrawNo)
       if (idx < 0) return fail(res, '500', '提现单不存在或已被删除')
       const w = db.withdraws[idx]
-      if (w.state !== 2) return fail(res, '500', '仅已驳回的提现单可删除，审核中/已到账记录涉及资金流向须保留')
+      // 超级管理员删除不受提现状态限制
       db.withdraws.splice(idx, 1)
       db.logs.push({ id: nextId(), module: 'deleteWithdraw', content: JSON.stringify({ withdrawNo: w.withdrawNo }), operator: 'admin', ip: '127.0.0.1', createdAt: iso(new Date()) })
       return ok(res, { message: `提现单「${w.withdrawNo}」已删除` })
@@ -1207,8 +1201,7 @@ async function handle(method: string, path: string, body: Record<string, unknown
       const cid = Number(body.categoryId)
       const idx = db.categories.findIndex((c) => c.id === cid)
       if (idx < 0) return fail(res, '500', '类目不存在或已被删除')
-      if (db.categories.some((c) => c.parentId === cid)) return fail(res, '500', '该类目下存在子类目，请先删除子类目')
-      if (db.goods.some((g) => g.categoryId === cid)) return fail(res, '500', '该类目下存在商品，无法删除')
+      // 超级管理员删除不受子类目/商品引用限制
       const c = db.categories[idx]
       db.categories.splice(idx, 1)
       db.logs.push({ id: nextId(), module: 'deleteCategory', content: JSON.stringify({ categoryId: cid }), operator: 'admin', ip: '127.0.0.1', createdAt: iso(new Date()) })

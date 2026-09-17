@@ -95,7 +95,21 @@
                 <el-input v-model="regForm.shopPhone" placeholder="11位手机号" maxlength="11" />
               </el-form-item>
               <el-form-item label="经营地址" prop="shopAddress">
-                <el-input v-model="regForm.shopAddress" placeholder="省市区 + 详细地址" maxlength="255" />
+                <el-cascader
+                  v-model="areaPath"
+                  :options="areaOptions"
+                  placeholder="省 / 市 / 区县"
+                  clearable
+                  style="width: 100%"
+                  @change="syncAddress"
+                />
+                <el-input
+                  v-model="addrDetail"
+                  placeholder="详细地址(街道/门牌号)"
+                  maxlength="150"
+                  style="margin-top: 8px"
+                  @input="syncAddress"
+                />
               </el-form-item>
               <el-form-item label="登录账号" prop="username">
                 <el-input v-model="regForm.username" placeholder="4~20位字母/数字/下划线" />
@@ -144,6 +158,7 @@ import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { User, Lock, Key, TrendCharts, Van, Medal, ArrowLeft } from '@element-plus/icons-vue'
 import { captchaImage, mchLogin, mchRegister } from '@/api/modules'
 import { useSessionStore } from '@/stores/session'
+import { codeToText, regionData } from 'element-china-area-data'
 
 const router = useRouter()
 const session = useSessionStore()
@@ -164,6 +179,18 @@ const regForm = reactive({
 const captchaImg = ref('')
 const captchaKey = ref('')
 
+// 经营地址：省/市/区县三级级联下拉（数据源 element-china-area-data），
+// 后端仅存 shopAddress 一个字段，故选择结果与详细地址在 syncAddress 中合并
+const areaOptions = regionData
+const areaPath = ref<string[]>([])
+const addrDetail = ref('')
+
+function syncAddress() {
+  const prefix = areaPath.value.map((code) => codeToText[code] ?? '').join('')
+  regForm.shopAddress = (prefix + addrDetail.value).trim()
+  regFormRef.value?.validateField('shopAddress').catch(() => {})
+}
+
 const demoShops = [
   { username: 'shop1', name: '星选数码旗舰店' },
   { username: 'shop2', name: '鲜果之家' },
@@ -179,8 +206,15 @@ const regRules: FormRules = {
     { pattern: /^1[3-9]\d{9}$/, message: '请输入11位有效手机号', trigger: 'blur' },
   ],
   shopAddress: [
-    { required: true, message: '请输入经营地址', trigger: 'blur' },
+    { required: true, message: '请选择省市区并填写详细地址', trigger: 'blur' },
     { max: 255, message: '地址不能超过255个字', trigger: 'blur' },
+    {
+      validator: (_rule: unknown, _value: unknown, callback: (error?: Error) => void) => {
+        if (areaPath.value.length !== 3) callback(new Error('请选择完整的省 / 市 / 区县'))
+        else callback()
+      },
+      trigger: 'change',
+    },
   ],
   username: [
     { required: true, message: '请输入登录账号', trigger: 'blur' },

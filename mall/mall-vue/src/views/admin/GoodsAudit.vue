@@ -148,11 +148,11 @@ async function toggle(row: Goods) {
 
 const { isAdmin, adminDelete } = useAdminDelete()
 
-/** 删除商品:被订单引用的商品禁止删除,后端校验兜底 */
+/** 删除商品:超级管理员不受订单引用限制,删除后同步清理详情缓存与库存 */
 async function remove(row: Goods) {
   const ok = await adminDelete(
     `商品「${row.goodsName}」(${row.goodsNum})`,
-    '被订单引用的商品不可删除,删除后商品缓存与库存将同步清理。',
+    '删除后不可恢复,商品缓存与库存将同步清理;即使被订单引用也可删除。',
     (t) => adminGoodsDelete(row.goodsNum, t),
     `商品「${row.goodsName}」已删除`,
   )

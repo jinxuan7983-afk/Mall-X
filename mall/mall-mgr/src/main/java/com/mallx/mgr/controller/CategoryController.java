@@ -51,7 +51,7 @@ public class CategoryController {
 
     /**
      * 平台删除类目（仅 ADMIN 可执行）。
-     * 删除策略：存在子类目或商品引用时禁止删除（级联风险由业务规则拦截），通过校验后物理删除。
+     * 超级管理员不受限制：即使存在子类目或商品引用也可物理删除，是否继续由前端确认框把关。
      */
     @PostMapping("/admin/category/delete")
     public R delete(@RequestBody Map<String, Object> req,
@@ -65,16 +65,6 @@ public class CategoryController {
         Category category = categoryMapper.selectById(categoryId);
         if (category == null) {
             throw new BizException("类目不存在或已被删除");
-        }
-        Long children = categoryMapper.selectCount(Wrappers.<Category>lambdaQuery()
-                .eq(Category::getParentId, categoryId));
-        if (children != null && children > 0) {
-            throw new BizException("该类目下存在子类目，请先删除子类目");
-        }
-        Long goodsRefs = goodsMapper.selectCount(Wrappers.<Goods>lambdaQuery()
-                .eq(Goods::getCategoryId, categoryId));
-        if (goodsRefs != null && goodsRefs > 0) {
-            throw new BizException("该类目下存在商品，无法删除");
         }
         categoryMapper.deleteById(categoryId);
         return R.ok("类目「" + category.getCategoryName() + "」已删除");

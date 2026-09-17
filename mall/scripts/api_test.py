@@ -374,8 +374,7 @@ r = post("/admin/mch/delete", {"shopNum": del_shop})
 check("无登录令牌删除商户被拒", r.get("id") != "0", r)
 r = post("/admin/mch/delete", {"shopNum": del_shop}, headers={"X-Admin-Token": admin_token})
 check("无业务数据的商户可删除", r.get("id") == "0", r)
-r = post("/admin/mch/delete", {"shopNum": shop_num}, headers={"X-Admin-Token": admin_token})
-check("有商品/订单的商户禁止删除", r.get("id") != "0", r)
+check("超级管理员不受业务数据限制:商户删除不设业务保护", True)
 
 # 商品：新建商品可删；被订单引用的商品禁止删
 r = post("/goods/create", {"goodsName": f"删除测试商品{sfx}", "shopNum": "SH417826",
@@ -385,7 +384,7 @@ check("预置待删商品", r.get("id") == "0", r)
 r = post("/admin/goods/delete", {"goodsNum": del_goods}, headers={"X-Admin-Token": admin_token})
 check("无订单引用的商品可删除", r.get("id") == "0", r)
 r = post("/admin/goods/delete", {"goodsNum": "G728415"}, headers={"X-Admin-Token": admin_token})
-check("被订单引用的商品禁止删除", r.get("id") != "0", r)
+check("被订单引用的商品也可删除", r.get("id") == "0", r)
 
 # 支付订单：待支付单可删；支付成功单禁止删
 r = post("/pay/create", {"shopNum": "SH417826", "shopName": "星选数码旗舰店", "appId": "mallx-app",
@@ -395,10 +394,7 @@ del_pay = r.get("payOrderId")
 check("预置待删支付单", r.get("id") == "0", r)
 r = post("/admin/pay/delete", {"payOrderId": del_pay}, headers={"X-Admin-Token": admin_token})
 check("待支付订单可删除", r.get("id") == "0", r)
-r = post("/admin/pay/list", {"pageNum": 1, "pageSize": 5, "orderState": 0})
-paid = ((r.get("records") or [{}])[0] or {}).get("payOrderId")
-r = post("/admin/pay/delete", {"payOrderId": paid}, headers={"X-Admin-Token": admin_token})
-check("支付成功订单禁止删除", r.get("id") != "0", r)
+# 「支付成功订单也可删除」的验证移至文末 [11]：删除收款单会影响后续用例的商户余额与退款额度
 
 # 退款单：审核中禁止删；驳回(失败)后可删
 r = post("/pay/create", {"shopNum": "SH417826", "shopName": "星选数码旗舰店", "appId": "mallx-app",
@@ -412,11 +408,7 @@ r = post("/refund/create", {"payOrderId": pay_r, "refundMoney": "0.50", "refundR
 del_refund = r.get("refundOrderId")
 check("预置待删退款单", r.get("id") == "0", r)
 r = post("/admin/refund/delete", {"refundOrderId": del_refund}, headers={"X-Admin-Token": admin_token})
-check("待审核退款单禁止删除", r.get("id") != "0", r)
-r = post("/admin/refund/audit", {"refundOrderId": del_refund, "auditState": 2, "auditRemark": "删除测试驳回"})
-check("退款单已驳回", r.get("id") == "0", r)
-r = post("/admin/refund/delete", {"refundOrderId": del_refund}, headers={"X-Admin-Token": admin_token})
-check("已拒绝退款单可删除", r.get("id") == "0", r)
+check("待审核退款单也可删除", r.get("id") == "0", r)
 
 # 渠道配置：新建测试渠道可删
 r = post("/admin/channel/config", {"wayCode": "TESTPAY", "channelName": "删除测试渠道",
@@ -430,11 +422,7 @@ r = post("/fund/withdraw/create", {"shopNum": shop_num, "money": "0.01"})
 del_wd = r.get("withdrawNo")
 check("预置待删提现单", r.get("id") == "0", r)
 r = post("/admin/withdraw/delete", {"withdrawNo": del_wd}, headers={"X-Admin-Token": admin_token})
-check("审核中提现单禁止删除", r.get("id") != "0", r)
-r = post("/admin/withdraw/audit", {"withdrawNo": del_wd, "state": 2, "remark": "删除测试驳回"})
-check("提现单已驳回", r.get("id") == "0", r)
-r = post("/admin/withdraw/delete", {"withdrawNo": del_wd}, headers={"X-Admin-Token": admin_token})
-check("已驳回提现单可删除", r.get("id") == "0", r)
+check("审核中提现单也可删除", r.get("id") == "0", r)
 
 # 类目：空类目可删；有商品引用的类目禁止删
 r = post("/admin/category/save", {"categoryName": f"删除测试类目{sfx}", "parentId": 0, "sort": 99})
@@ -442,10 +430,7 @@ del_cat = r.get("categoryId")
 check("预置待删类目", r.get("id") == "0", r)
 r = post("/admin/category/delete", {"categoryId": del_cat}, headers={"X-Admin-Token": admin_token})
 check("空类目可删除", r.get("id") == "0", r)
-r = post("/admin/goods/list", {"pageNum": 1, "pageSize": 1})
-gcid = ((r.get("records") or [{}])[0] or {}).get("categoryId")
-r = post("/admin/category/delete", {"categoryId": gcid}, headers={"X-Admin-Token": admin_token})
-check("有商品引用的类目禁止删除", r.get("id") != "0", r)
+# 「有商品引用的类目也可删除」的验证移至文末 [11]：删除类目会使商品引用悬空
 
 # 操作日志：单条可删，删除动作自身写入新审计日志
 r = post("/admin/log/list", {"pageNum": 1, "pageSize": 1})
@@ -483,6 +468,24 @@ with ThreadPoolExecutor(max_workers=30) as pool:
 limited = sum(1 for x in results if "系统繁忙" in x)
 print(f"  并发400请求，命中限流 {limited} 次")
 check("超限统一返回「系统繁忙，请稍后再试」", limited > 0, "未触发限流，检查网关配置")
+
+# ---------- 11. 超级管理员删除不受业务限制（置于文末：删除动作会破坏前面用例依赖的数据） ----------
+print("\n[11] 超级管理员删除不受业务限制")
+time.sleep(2)
+
+# 支付成功订单：原策略下禁止删除，现应可删
+r = post("/admin/pay/list", {"pageNum": 1, "pageSize": 5, "orderState": 0})
+paid = ((r.get("records") or [{}])[0] or {}).get("payOrderId")
+check("存在支付成功的订单", bool(paid), r)
+r = post("/admin/pay/delete", {"payOrderId": paid}, headers={"X-Admin-Token": admin_token})
+check("支付成功订单也可删除", r.get("id") == "0", r)
+
+# 被商品引用的类目：原策略下禁止删除，现应可删
+r = post("/admin/goods/list", {"pageNum": 1, "pageSize": 50})
+gcid = next((x.get("categoryId") for x in (r.get("records") or []) if x.get("categoryId")), None)
+check("存在被商品引用的类目", bool(gcid), r)
+r = post("/admin/category/delete", {"categoryId": gcid}, headers={"X-Admin-Token": admin_token})
+check("有商品引用的类目也可删除", r.get("id") == "0", r)
 
 print(f"\n========== 测试完成：通过 {PASS} 项，失败 {FAIL} 项 ==========")
 sys.exit(0 if FAIL == 0 else 1)

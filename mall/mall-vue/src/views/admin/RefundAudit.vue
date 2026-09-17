@@ -50,7 +50,7 @@
       <el-table-column label="申请时间" width="150">
         <template #default="{ row }"><span class="small num">{{ fmtTime(row.createdAt) }}</span></template>
       </el-table-column>
-      <el-table-column label="操作" width="180" align="center" fixed="right">
+      <el-table-column label="操作" width="180" align="center">
         <template #default="{ row }">
           <template v-if="row.refundState === 0">
             <el-button link type="success" @click="audit(row, 1)">通过</el-button>
@@ -134,7 +134,7 @@ const { canDelete, adminDelete } = useAdminDelete()
 async function remove(row: RefundOrder) {
   const ok = await adminDelete(
     `退款单「${row.refundOrderId}」`,
-    '仅已拒绝的记录可删除,待审核、处理中与已完成的记录须留痕不可删除。',
+    '删除后不可恢复;任意状态的退款单均可删除。',
     (t) => adminRefundDelete(row.refundOrderId, t),
     `退款单「${row.refundOrderId}」已删除`,
   )

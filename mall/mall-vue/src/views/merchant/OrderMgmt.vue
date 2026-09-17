@@ -26,7 +26,7 @@
       <el-table-column label="下单时间" width="160">
         <template #default="{ row }"><span class="num small">{{ row.createdAt }}</span></template>
       </el-table-column>
-      <el-table-column label="操作" width="150" align="center" fixed="right">
+      <el-table-column label="操作" width="150" align="center">
         <template #default="{ row }">
           <el-button v-if="row.orderState === 1" link type="primary" @click="openDeliver(row)">发货</el-button>
           <el-button link @click="showDetail(row.orderNum)">详情</el-button>

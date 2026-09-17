@@ -417,6 +417,10 @@ public class RefundService {
                             .set(PayOrderView::getOrderState, MallConstant.PAY_STATE_REFUNDED)
                             .eq(PayOrderView::getPayOrderId, refund.getPayOrderId())
                             .eq(PayOrderView::getOrderState, MallConstant.PAY_STATE_SUCCESS));
+                    // 业务订单同步关闭：否则订单停留在「待发货」，退款后商户仍可发货
+                    if (refund.getOrderNum() != null && orderMapper.markClosedByRefund(refund.getOrderNum()) > 0) {
+                        log.info("全额退款完成，业务订单已关闭 orderNum={}", refund.getOrderNum());
+                    }
                 }
             }
             return R.ok("退款成功");
@@ -449,14 +453,11 @@ public class RefundService {
 
     /**
      * 平台删除退款单（仅 ADMIN 可执行）。
-     * 删除策略：仅已拒绝记录可删；待审核/处理中/已完成涉及渠道资金流向，须留痕禁止删除。
+     * 超级管理员不受状态限制：经前端确认后任意状态的退款单均可物理删除。
      */
     public R deleteRefund(String refundOrderId, String operatorToken) {
         adminGuard.requireAdmin(operatorToken);
         RefundOrder refund = findRefund(refundOrderId);
-        if (refund.getRefundState() != MallConstant.REFUND_FAIL) {
-            throw new BizException("仅已拒绝的记录可删除，待审核/处理中/已完成的记录须留痕");
-        }
         refundOrderMapper.deleteById(refund.getId());
         return R.ok("退款单「" + refundOrderId + "」已删除");
     }

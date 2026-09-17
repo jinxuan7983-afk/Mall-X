@@ -48,7 +48,7 @@
       <el-table-column label="创建时间" width="170">
         <template #default="{ row }"><span class="small num">{{ fmtTime(row.createdAt) }}</span></template>
       </el-table-column>
-      <el-table-column v-if="canDelete" label="操作" width="90" align="center" fixed="right">
+      <el-table-column v-if="canDelete" label="操作" width="90" align="center">
         <template #default="{ row }">
           <el-button link type="danger" @click="remove(row)">删除</el-button>
         </template>
@@ -91,7 +91,7 @@ const { canDelete, adminDelete } = useAdminDelete()
 async function remove(row: PayOrder) {
   const ok = await adminDelete(
     `支付订单「${row.payOrderId}」`,
-    '仅支付失败/订单关闭/待支付的订单可删除,支付成功与已退款订单涉及资金流向不可删除。',
+    '删除后不可恢复;任意状态的支付订单均可删除(含支付成功与已退款)。',
     (t) => adminPayDelete(row.payOrderId, t),
     `支付订单「${row.payOrderId}」已删除`,
   )

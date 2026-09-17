@@ -72,6 +72,9 @@ function goSearch() {
 }
 function logout() {
   session.setUser(null)
+  // 购物车存放在与账号无关的 localStorage 键中，退出时必须清空，
+  // 否则上一个账号加入的商品会残留给下一个登录用户
+  cart.clear()
   router.push('/')
 }
 </script>

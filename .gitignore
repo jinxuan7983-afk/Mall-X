@@ -1,6 +1,10 @@
 # 根目录级忽略(mall/ 内规则见 mall/.gitignore)
 *.zip
+*.rar
+*.7z
 /*.yaml
+*.log
+tmp_*
 .playwright-cli/
 .workbuddy/
 docker/mysql-data/

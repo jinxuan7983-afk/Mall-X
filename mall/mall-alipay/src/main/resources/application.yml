@@ -52,6 +52,9 @@ mallx:
     close-delay-level: ${PAY_CLOSE_DELAY_LEVEL:16}
     # 渠道未配置沙箱密钥时启用内置模拟收银台，演示完整支付闭环
     mock-enabled: ${PAY_MOCK_ENABLED:true}
+    # 模拟收银台/沙箱回跳对外可访问的基址；留空则按当前请求推导。
+    # 容器化部署必须显式指定（网关回传的是容器内网地址，浏览器不可达）
+    mock-base-url: ${PAY_MOCK_BASE_URL:}
     alipay-notify-url: ${ALIPAY_NOTIFY_URL:http://localhost:10010/pay/callback/alipay}
     alipay-return-url: ${ALIPAY_RETURN_URL:http://localhost:10010/pay/mock/cashier}
   internal:

@@ -71,7 +71,7 @@
       <el-table-column label="申请时间" width="150">
         <template #default="{ row }"><span class="small num">{{ fmtTime(row.createdAt) }}</span></template>
       </el-table-column>
-      <el-table-column label="操作" width="180" align="center" fixed="right">
+      <el-table-column label="操作" width="180" align="center">
         <template #default="{ row }">
           <template v-if="row.refundState === 0">
             <el-button link type="success" @click="audit(row, 1)">同意退款</el-button>

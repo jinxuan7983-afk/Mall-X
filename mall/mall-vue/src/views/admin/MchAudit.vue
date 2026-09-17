@@ -31,7 +31,7 @@
       <el-table-column label="入驻时间" width="110">
         <template #default="{ row }"><span class="small num">{{ fmtTime(row.createdAt).slice(0, 10) }}</span></template>
       </el-table-column>
-      <el-table-column label="操作" width="240" align="center" fixed="right">
+      <el-table-column label="操作" width="240" align="center">
         <template #default="{ row }">
           <template v-if="row.shopState === 0">
             <el-button link type="success" @click="audit(row, 1)">通过</el-button>
@@ -148,7 +148,7 @@ const { canDelete, adminDelete } = useAdminDelete()
 async function remove(row: Mch) {
   const ok = await adminDelete(
     `商户「${row.shopName}」(${row.shopNum})`,
-    '仅无商品、订单与资金记录的商户可删除,删除后不可恢复。',
+    '删除后不可恢复；该商户名下的商品、订单与资金记录不会被一并删除。',
     (t) => adminMchDelete(row.shopNum, t),
     `商户「${row.shopName}」已删除`,
   )

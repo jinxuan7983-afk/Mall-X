@@ -157,7 +157,7 @@ public class GoodsService {
 
     /**
      * 管理员删除商品（仅 ADMIN 可执行）。
-     * 删除策略：被订单引用时为保证交易可追溯禁止删除（可改为下架）。
+     * 超级管理员不受限制：即使被订单引用也可删除（force=true 跳过引用校验）。
      */
     public R adminDelete(String goodsNum, String operatorToken) {
         adminGuard.requireAdmin(operatorToken);
@@ -168,7 +168,7 @@ public class GoodsService {
         if (goods == null) {
             throw new BizException("商品不存在或已被删除");
         }
-        doDeleteGoods(goods);
+        doDeleteGoods(goods, true);
         return R.ok("商品「" + goods.getGoodsName() + "」已删除");
     }
 
@@ -188,16 +188,22 @@ public class GoodsService {
         if (!goods.getShopNum().equals(shopNum)) {
             throw new BizException("无权操作其他商户的商品");
         }
-        doDeleteGoods(goods);
+        doDeleteGoods(goods, false);
         return R.ok("商品「" + goods.getGoodsName() + "」已删除");
     }
 
-    /** 删除商品：订单引用校验 → 物理删除 → 清理详情缓存与 Redis 库存（管理端/商户端共用） */
-    private void doDeleteGoods(Goods goods) {
-        Long refs = orderItemMapper.selectCount(Wrappers.<OrderItem>lambdaQuery()
-                .eq(OrderItem::getGoodsNum, goods.getGoodsNum()));
-        if (refs != null && refs > 0) {
-            throw new BizException("该商品已被订单引用，为保证交易可追溯不可删除，可改为下架");
+    /**
+     * 删除商品：物理删除 → 清理详情缓存与 Redis 库存（管理端/商户端共用）。
+     *
+     * @param force true = 超级管理员，跳过订单引用校验；false = 商户自助删除，被订单引用时仍拒绝
+     */
+    private void doDeleteGoods(Goods goods, boolean force) {
+        if (!force) {
+            Long refs = orderItemMapper.selectCount(Wrappers.<OrderItem>lambdaQuery()
+                    .eq(OrderItem::getGoodsNum, goods.getGoodsNum()));
+            if (refs != null && refs > 0) {
+                throw new BizException("该商品已被订单引用，为保证交易可追溯不可删除，可改为下架");
+            }
         }
         goodsMapper.deleteById(goods.getId());
         evictCache(goods.getGoodsNum());

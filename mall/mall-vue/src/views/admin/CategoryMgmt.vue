@@ -119,11 +119,11 @@ async function save() {
 
 const { canDelete, adminDelete } = useAdminDelete()
 
-/** 删除类目:存在子类目或商品引用时禁止删除(后端校验兜底) */
+/** 删除类目:超级管理员不受子类目/商品引用限制 */
 async function remove(row: Category) {
   const ok = await adminDelete(
     `类目「${row.categoryName}」`,
-    '存在子类目或商品引用的类目不可删除。',
+    '删除后不可恢复;存在子类目或商品引用时也可强制删除。',
     (t) => adminCategoryDelete(row.id, t),
     `类目「${row.categoryName}」已删除`,
   )

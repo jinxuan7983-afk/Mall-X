@@ -26,7 +26,7 @@
       <el-table-column label="完成时间" width="150">
         <template #default="{ row }"><span class="small num">{{ fmtTime(row.finishTime) }}</span></template>
       </el-table-column>
-      <el-table-column label="操作" width="175" align="center" fixed="right">
+      <el-table-column label="操作" width="175" align="center">
         <template #default="{ row }">
           <template v-if="row.state === 0">
             <el-button link type="success" @click="audit(row, 1)">通过</el-button>
@@ -91,7 +91,7 @@ const { canDelete, adminDelete } = useAdminDelete()
 async function remove(row: Withdraw) {
   const ok = await adminDelete(
     `提现单「${row.withdrawNo}」`,
-    '仅已驳回的提现单可删除,审核中与已到账记录涉及资金流向不可删除。',
+    '删除后不可恢复;任意状态的提现单均可删除。',
     (t) => adminWithdrawDelete(row.withdrawNo, t),
     `提现单「${row.withdrawNo}」已删除`,
   )

@@ -85,8 +85,8 @@ public class AdminService {
 
     /**
      * 商户删除（仅 ADMIN 可执行）。
-     * 删除策略：存在商品/业务订单/支付订单/退款/提现等业务数据时禁止删除（保证交易与资金可追溯）；
-     * 通过校验后物理删除商户，并级联清理其差异化费率配置（配置类数据随主体删除）。
+     * 超级管理员不受业务数据限制：经前端确认后直接物理删除商户，并级联清理其差异化费率配置。
+     * 注意：该商户名下的商品/订单/支付/退款/提现记录仍会保留，仅商户主体被移除。
      */
     public R deleteMch(String shopNum, String operatorToken) {
         adminGuard.requireAdmin(operatorToken);
@@ -97,21 +97,6 @@ public class AdminService {
         if (mch == null) {
             throw new BizException("商户不存在或已被删除");
         }
-        if (exists(goodsMapper, Wrappers.<Goods>lambdaQuery().eq(Goods::getShopNum, shopNum))) {
-            throw new BizException("该商户下仍有商品，请先处理商品后再删除");
-        }
-        if (exists(orderMapper, Wrappers.<BizOrder>lambdaQuery().eq(BizOrder::getShopNum, shopNum))) {
-            throw new BizException("该商户存在业务订单，为保证交易可追溯不可删除");
-        }
-        if (exists(payOrderViewMapper, Wrappers.<PayOrderView>lambdaQuery().eq(PayOrderView::getShopNum, shopNum))) {
-            throw new BizException("该商户存在支付订单，为保证资金可追溯不可删除");
-        }
-        if (exists(refundOrderMapper, Wrappers.<RefundOrder>lambdaQuery().eq(RefundOrder::getShopNum, shopNum))) {
-            throw new BizException("该商户存在退款记录，为保证资金可追溯不可删除");
-        }
-        if (exists(withdrawMapper, Wrappers.<Withdraw>lambdaQuery().eq(Withdraw::getShopNum, shopNum))) {
-            throw new BizException("该商户存在提现记录，为保证资金可追溯不可删除");
-        }
         mchRateMapper.delete(Wrappers.<MchRate>lambdaQuery().eq(MchRate::getShopNum, shopNum));
         mchMapper.deleteById(mch.getId());
         return R.ok("商户「" + mch.getShopName() + "」已删除");
@@ -119,7 +104,7 @@ public class AdminService {
 
     /**
      * 支付订单删除（仅 ADMIN 可执行）。
-     * 删除策略：仅支付失败/订单关闭/待支付状态可删；支付成功与已退款涉及资金流向，须留痕禁止删除。
+     * 超级管理员不受状态限制：经前端确认后任意状态的支付订单均可物理删除。
      */
     public R deletePayOrder(String payOrderId, String operatorToken) {
         adminGuard.requireAdmin(operatorToken);
@@ -131,15 +116,11 @@ public class AdminService {
         if (payOrder == null) {
             throw new BizException("支付订单不存在或已被删除");
         }
-        int state = payOrder.getOrderState() == null ? -1 : payOrder.getOrderState();
-        if (state == MallConstant.PAY_STATE_SUCCESS || state == MallConstant.PAY_STATE_REFUNDED) {
-            throw new BizException("支付成功/已退款的订单涉及资金流向，不可删除");
-        }
         payOrderViewMapper.deleteById(payOrder.getId());
         return R.ok("支付订单「" + payOrderId + "」已删除");
     }
 
-    /** 渠道配置删除（仅 ADMIN 可执行）；保护规则：系统须保留至少一个支付渠道 */
+    /** 渠道配置删除（仅 ADMIN 可执行）；超级管理员不受「至少保留一个渠道」限制 */
     public R deleteChannel(String wayCode, String operatorToken) {
         adminGuard.requireAdmin(operatorToken);
         if (!StringUtils.hasText(wayCode)) {
@@ -149,10 +130,6 @@ public class AdminService {
                 .eq(ChannelConfig::getWayCode, wayCode));
         if (config == null) {
             throw new BizException("渠道配置不存在或已被删除");
-        }
-        Long total = channelConfigMapper.selectCount(null);
-        if (total != null && total <= 1) {
-            throw new BizException("系统须保留至少一个支付渠道，无法删除");
         }
         channelConfigMapper.deleteById(config.getId());
         return R.ok("支付渠道「" + config.getChannelName() + "」配置已删除");

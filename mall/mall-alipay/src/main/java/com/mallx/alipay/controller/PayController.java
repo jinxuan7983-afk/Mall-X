@@ -9,6 +9,7 @@ import com.mallx.common.result.R;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,10 +25,20 @@ public class PayController {
 
     private final PayService payService;
 
+    /**
+     * 收银台页面/沙箱回跳对外可访问的基址（如 http://localhost:10010）。
+     * 留空时回退到按当前请求推导；但网关经 lb:// 转发会给下游带上实例内网地址，
+     * 容器化部署下即为 172.x.x.x，浏览器（宿主机）无法访问，必须显式配置 PAY_MOCK_BASE_URL。
+     */
+    @Value("${mallx.pay.mock-base-url:}")
+    private String mockBaseUrl;
+
     /** 4.2.1 统一支付下单接口 */
     @PostMapping("/pay/create")
     public R create(@Valid @RequestBody PayCreateReq req, HttpServletRequest request) {
-        String base = request.getScheme() + "://" + request.getServerName() + ":" + request.getServerPort();
+        String base = (mockBaseUrl == null || mockBaseUrl.isBlank())
+                ? request.getScheme() + "://" + request.getServerName() + ":" + request.getServerPort()
+                : mockBaseUrl;
         return payService.create(req, base);
     }
 

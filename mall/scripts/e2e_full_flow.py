@@ -129,7 +129,13 @@ with sync_playwright() as p:
         page.wait_for_timeout(800)
         page.get_by_placeholder("店铺名称(64字以内)").fill(SHOP_NAME)
         page.get_by_placeholder("11位手机号").fill(PHONE)
-        page.get_by_placeholder("省市区 + 详细地址").fill("广东省广州市白云区全流程大道 1 号")
+        # 经营地址：省/市/区县三级级联下拉 + 详细地址
+        page.get_by_placeholder("省 / 市 / 区县").click()
+        page.wait_for_timeout(700)
+        for level in range(3):
+            page.locator(".el-cascader-menu").nth(level).locator(".el-cascader-node").first.click()
+            page.wait_for_timeout(500)
+        page.get_by_placeholder("详细地址(街道/门牌号)").fill("全流程大道 1 号")
         page.get_by_placeholder("4~20位字母/数字/下划线").fill(SHOP_USER)
         page.get_by_placeholder("6~20位").fill(PWD)
         fill_captcha(page, trigger=page.locator("img[alt='验证码']").first)
@@ -393,8 +399,9 @@ with sync_playwright() as p:
 
         page.goto(BASE + "/admin/logs", wait_until="networkidle", timeout=30000)
         page.wait_for_timeout(1500)
+        # 管理端操作日志已做中文可读化（模块名由 withrdrawAudit/audit 翻译为中文动作），断言匹配中文
         step("操作日志(AOP)含审核记录",
-             page.get_by_text("withdrawAudit").count() > 0 or page.get_by_text("refundAudit").count() > 0)
+             page.get_by_text("提现审核").count() > 0 or page.get_by_text("退款审核").count() > 0)
         shot(page, "admin_logs")
     except Exception:
         traceback.print_exc()

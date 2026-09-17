@@ -30,4 +30,13 @@ public interface OrderMapper extends BaseMapper<BizOrder> {
     @Update("UPDATE t_order SET order_state = 4, close_time = NOW() "
             + "WHERE order_num = #{orderNum} AND order_state = 0")
     int markClosed(@Param("orderNum") String orderNum);
+
+    /**
+     * 状态机：全额退款完成 → 已关闭。
+     * 仅作用于「待发货」订单（已发货/已完成不在其列），
+     * 避免退款完成后订单仍停留在「待发货」而被继续发货。
+     */
+    @Update("UPDATE t_order SET order_state = 4, close_time = NOW() "
+            + "WHERE order_num = #{orderNum} AND order_state = 1")
+    int markClosedByRefund(@Param("orderNum") String orderNum);
 }

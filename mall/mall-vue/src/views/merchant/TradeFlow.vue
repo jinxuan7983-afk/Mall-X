@@ -36,7 +36,7 @@
       <el-table-column label="创建时间" width="160">
         <template #default="{ row }"><span class="small num">{{ row.createdAt }}</span></template>
       </el-table-column>
-      <el-table-column label="操作" width="90" align="center" fixed="right">
+      <el-table-column label="操作" width="90" align="center">
         <template #default="{ row }">
           <el-button v-if="row.orderState === 0" link type="warning" @click="openRefund(row)">退款</el-button>
         </template>
