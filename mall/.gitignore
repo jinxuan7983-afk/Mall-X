@@ -11,3 +11,10 @@ sql/backup/
 node_modules/
 dist/
 .DS_Store
+
+# 编辑器/代码分析工具的本地索引缓存
+.fastgraph/
+
+# 课程材料与提取文本，属于教学文档，不入库
+*.pdf
+docs/*-提取文本.txt
